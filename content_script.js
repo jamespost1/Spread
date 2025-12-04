@@ -3,21 +3,44 @@
 
 const TRUE_PRICE_ATTR = "data-trueprice-injected";
 
+/* -----------------------------------------------------------
+   1. Targeted selectors to reduce false positives
+----------------------------------------------------------- */
+const PRICE_SELECTORS = [
+  ".price",
+  ".a-price-whole",
+  ".a-price .a-offscreen",
+  "[data-price]",
+  ".price-tag",
+  ".product-price",
+];
+
+/* -----------------------------------------------------------
+   2. Helper: extract structured, filtered price elements
+----------------------------------------------------------- */
 function findPriceNodes(root = document.body) {
   const nodes = [];
-  // Strategy:
-  // 1) Look for elements that contain $ and have reasonable length
-  // 2) Also target common attributes/classes used by e-commerce sites
-  const candidates = root.querySelectorAll("*:not(script):not(style):not(noscript)");
-  for (const el of candidates) {
-    if (el.classList.contains("trueprice-badge") || 
-    el.classList.contains("trueprice-badge-wrapper")) {
-      continue;
+
+  // Pass 1: High-confidence selector-based matches
+  const selectorMatches = root.querySelectorAll(PRICE_SELECTORS.join(","));
+  for (const el of selectorMatches) {
+    if (shouldSkip(el)) continue;
+
+    const text = el.innerText.trim();
+    const parsed = parsePriceText(text);
+    if (parsed) {
+      nodes.push({ el, parsed });
     }
-    if (el.hasAttribute(TRUE_PRICE_ATTR)) continue;
-    // Limit to elements that have text content length < 80 to avoid paragraphs
+  }
+
+  // Pass 2: Backup fuzzy scan for sites without selectors
+  const all = root.querySelectorAll("*:not(script):not(style):not(noscript)");
+  for (const el of all) {
+    if (shouldSkip(el)) continue;
+
     const text = el.textContent && el.textContent.trim();
     if (!text || text.length > 80) continue;
+
     if (text.includes("$") || /\d{1,3}(?:[,\.]\d{2})/.test(text)) {
       const parsed = parsePriceText(text);
       if (parsed !== null && parsed >= 0.01) {
@@ -25,39 +48,62 @@ function findPriceNodes(root = document.body) {
       }
     }
   }
+
   return nodes;
 }
 
+/* -----------------------------------------------------------
+   3. Filtering rules to avoid infinite loops + ugly placement
+----------------------------------------------------------- */
+function shouldSkip(el) {
+  if (el.hasAttribute(TRUE_PRICE_ATTR)) return true;
+  if (el.classList.contains("trueprice-badge-wrapper")) return true;
+  if (el.classList.contains("trueprice-badge")) return true;
+
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return true;
+
+  return false;
+}
+
+/* -----------------------------------------------------------
+   4. Inject badge WITHOUT shifting layout
+----------------------------------------------------------- */
 function injectBadge(el, basePrice) {
-  // Avoid injecting multiple times
   if (el.hasAttribute(TRUE_PRICE_ATTR)) return;
   el.setAttribute(TRUE_PRICE_ATTR, "1");
 
-  // Create wrapper div for badge
+  // Wrap original element so badge doesn’t push content down
   const wrapper = document.createElement("span");
   wrapper.className = "trueprice-badge-wrapper";
+  wrapper.style.position = "relative";
+  wrapper.style.display = "inline-block";
 
-  // Small loading state while we compute
-  const badge = document.createElement("span");
+  el.parentNode.insertBefore(wrapper, el);
+  wrapper.appendChild(el);
+
+  const badge = document.createElement("div");
   badge.className = "trueprice-badge";
   badge.textContent = "TruePrice: ...";
+  badge.style.position = "absolute";
+  badge.style.top = "-6px";
+  badge.style.right = "-6px";
+  badge.style.background = "#ff4d4d";
+  badge.style.color = "white";
+  badge.style.padding = "3px 6px";
+  badge.style.fontSize = "11px";
+  badge.style.borderRadius = "4px";
+  badge.style.zIndex = "99999";
+  badge.style.pointerEvents = "none";
+
   wrapper.appendChild(badge);
 
-  // Insert after the price element
-  // If element is inline, append; else try placing inline-block after
-  try {
-    el.parentNode.insertBefore(wrapper, el.nextSibling);
-  } catch (e) {
-    // fallback
-    el.appendChild(wrapper);
-  }
-
-  // Ask background/settings for defaults then compute
+  // Load settings + compute true price
   chrome.storage.sync.get(
     { taxRate: 0.08875, defaultShipping: 0, taxOnShipping: true },
     (settings) => {
       const { taxRate, defaultShipping, taxOnShipping } = settings;
-      // TODO: later call background service to find discounts; for MVP discount=0
+
       const { total, tax, shipping } = computeTruePrice({
         basePrice,
         shipping: defaultShipping,
@@ -65,6 +111,7 @@ function injectBadge(el, basePrice) {
         discount: 0,
         taxOnShipping
       });
+
       badge.textContent = `TruePrice: ${formatCurrency(total)}`;
       badge.title = `Base: ${formatCurrency(basePrice)}\nShipping: ${formatCurrency(shipping)}\nTax: ${formatCurrency(tax)}`;
       badge.dataset.truePriceValue = total;
@@ -72,7 +119,9 @@ function injectBadge(el, basePrice) {
   );
 }
 
-// Run initial pass and set up a MutationObserver for dynamic content (SPAs)
+/* -----------------------------------------------------------
+   5. Scan + Inject
+----------------------------------------------------------- */
 function scanAndInject(root = document.body) {
   const nodes = findPriceNodes(root);
   for (const { el, parsed } of nodes) {
@@ -80,15 +129,17 @@ function scanAndInject(root = document.body) {
   }
 }
 
-// initial scan
+/* -----------------------------------------------------------
+   6. Initial scan
+----------------------------------------------------------- */
 scanAndInject(document.body);
 
-// observe for DOM changes (debounced)
+/* -----------------------------------------------------------
+   7. Observe DOM changes (SPA support)
+----------------------------------------------------------- */
 let scanTimeout;
-const observer = new MutationObserver((mutations) => {
-  if (scanTimeout) clearTimeout(scanTimeout);
-  scanTimeout = setTimeout(() => {
-    scanAndInject(document.body);
-  }, 300);
+const observer = new MutationObserver(() => {
+  clearTimeout(scanTimeout);
+  scanTimeout = setTimeout(() => scanAndInject(document.body), 300);
 });
 observer.observe(document.body, { childList: true, subtree: true });
