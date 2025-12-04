@@ -73,32 +73,47 @@ function injectBadge(el, basePrice) {
   if (el.hasAttribute(TRUE_PRICE_ATTR)) return;
   el.setAttribute(TRUE_PRICE_ATTR, "1");
 
-  // Wrap original element so badge doesn’t push content down
-  const wrapper = document.createElement("span");
-  wrapper.className = "trueprice-badge-wrapper";
-  wrapper.style.position = "relative";
-  wrapper.style.display = "inline-block";
-
-  el.parentNode.insertBefore(wrapper, el);
-  wrapper.appendChild(el);
-
-  const badge = document.createElement("div");
+  // Create inline badge
+  const badge = document.createElement("span");
   badge.className = "trueprice-badge";
-  badge.textContent = "TruePrice: ...";
-  badge.style.position = "absolute";
-  badge.style.top = "-6px";
-  badge.style.right = "-6px";
-  badge.style.background = "#ff4d4d";
-  badge.style.color = "white";
-  badge.style.padding = "3px 6px";
-  badge.style.fontSize = "11px";
-  badge.style.borderRadius = "4px";
-  badge.style.zIndex = "99999";
-  badge.style.pointerEvents = "none";
+  badge.textContent = " (TruePrice: …) ";
+  badge.style.marginLeft = "6px";
+  badge.style.whiteSpace = "nowrap";
 
-  wrapper.appendChild(badge);
+  /* -------------------------
+     1. Copy price styling
+  ------------------------- */
+  try {
+    const originalStyle = window.getComputedStyle(el);
 
-  // Load settings + compute true price
+    // Copy only safe, visual styles
+    const styleProps = [
+      "fontSize",
+      "fontWeight",
+      "fontFamily",
+      "color",
+      "lineHeight"
+    ];
+
+    styleProps.forEach(prop => {
+      badge.style[prop] = originalStyle[prop];
+    });
+
+    // Slightly dim the color so it doesn’t overpower the original price
+    badge.style.opacity = "0.75";
+
+  } catch (err) {
+    // fallback only if style cloning fails
+    badge.style.fontSize = "0.9em";
+    badge.style.color = "#555";
+  }
+
+  // Insert directly after price element
+  el.insertAdjacentElement("afterend", badge);
+
+  /* -------------------------
+     2. Compute true price
+  ------------------------- */
   chrome.storage.sync.get(
     { taxRate: 0.08875, defaultShipping: 0, taxOnShipping: true },
     (settings) => {
@@ -112,9 +127,11 @@ function injectBadge(el, basePrice) {
         taxOnShipping
       });
 
-      badge.textContent = `TruePrice: ${formatCurrency(total)}`;
-      badge.title = `Base: ${formatCurrency(basePrice)}\nShipping: ${formatCurrency(shipping)}\nTax: ${formatCurrency(tax)}`;
-      badge.dataset.truePriceValue = total;
+      badge.textContent = ` (TruePrice: ${formatCurrency(total)})`;
+      badge.title =
+        `Base: ${formatCurrency(basePrice)}\n` +
+        `Shipping: ${formatCurrency(shipping)}\n` +
+        `Tax: ${formatCurrency(tax)}`;
     }
   );
 }
