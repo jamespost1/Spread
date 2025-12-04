@@ -36,7 +36,7 @@ The extension uses a simple content script (`content.js`) to:
 super-shopper/
 │
 ├── manifest.json          # Chrome extension config
-├── content.js             # Main logic injected into pages
+├── content_script.js             # Main logic injected into pages
 ├── price_utils.js         # Helper functions for parsing, math, and price logic
 ├── service_worker.js      # Background/service worker for extension events
 │
