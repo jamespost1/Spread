@@ -88,3 +88,18 @@ const observer = new MutationObserver((mutations) => {
   }, 300);
 });
 observer.observe(document.body, { childList: true, subtree: true });
+
+function updatePrices() {
+  const elems = document.querySelectorAll('.price:not([data-trueprice-processed])');
+
+  elems.forEach(el => {
+    const raw = el.innerText;
+    const value = extractPrice(raw);
+
+    if (!value) return;
+
+    const truePrice = calculateTruePrice(value);
+    el.innerText = `$${truePrice.toFixed(2)}`;
+    el.setAttribute('data-trueprice-processed', '1');
+  });
+}
