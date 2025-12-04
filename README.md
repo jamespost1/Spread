@@ -50,7 +50,6 @@ true-price-extension/
 └── README.md              # Project documentation
 ```
 
-
 ---
 
 ## Installation (Developer Mode)
