@@ -10,6 +10,10 @@ function findPriceNodes(root = document.body) {
   // 2) Also target common attributes/classes used by e-commerce sites
   const candidates = root.querySelectorAll("*:not(script):not(style):not(noscript)");
   for (const el of candidates) {
+    if (el.classList.contains("trueprice-badge") || 
+    el.classList.contains("trueprice-badge-wrapper")) {
+      continue;
+    }
     if (el.hasAttribute(TRUE_PRICE_ATTR)) continue;
     // Limit to elements that have text content length < 80 to avoid paragraphs
     const text = el.textContent && el.textContent.trim();
@@ -36,7 +40,7 @@ function injectBadge(el, basePrice) {
   // Small loading state while we compute
   const badge = document.createElement("span");
   badge.className = "trueprice-badge";
-  badge.textContent = "True: ...";
+  badge.textContent = "TruePrice: ...";
   wrapper.appendChild(badge);
 
   // Insert after the price element
@@ -61,7 +65,7 @@ function injectBadge(el, basePrice) {
         discount: 0,
         taxOnShipping
       });
-      badge.textContent = `True: ${formatCurrency(total)}`;
+      badge.textContent = `TruePrice: ${formatCurrency(total)}`;
       badge.title = `Base: ${formatCurrency(basePrice)}\nShipping: ${formatCurrency(shipping)}\nTax: ${formatCurrency(tax)}`;
       badge.dataset.truePriceValue = total;
     }
@@ -88,18 +92,3 @@ const observer = new MutationObserver((mutations) => {
   }, 300);
 });
 observer.observe(document.body, { childList: true, subtree: true });
-
-function updatePrices() {
-  const elems = document.querySelectorAll('.price:not([data-trueprice-processed])');
-
-  elems.forEach(el => {
-    const raw = el.innerText;
-    const value = extractPrice(raw);
-
-    if (!value) return;
-
-    const truePrice = calculateTruePrice(value);
-    el.innerText = `$${truePrice.toFixed(2)}`;
-    el.setAttribute('data-trueprice-processed', '1');
-  });
-}
