@@ -21,31 +21,36 @@ const PRICE_SELECTORS = [
 function findPriceNodes(root = document.body) {
   const nodes = [];
 
-  // Pass 1: High-confidence selector-based matches
-  const selectorMatches = root.querySelectorAll(PRICE_SELECTORS.join(","));
-  for (const el of selectorMatches) {
-    if (shouldSkip(el)) continue;
+  // Much stricter selectors → no phantom matches
+  const selectors = [
+    ".price",
+    ".a-price .a-offscreen",
+    ".a-price .a-price-whole",
+    "[data-price]",
+    ".product-price",
+    ".pricing",
+    ".price-tag",
+    ".amount"
+  ];
+
+  const candidates = root.querySelectorAll(selectors.join(","));
+
+  for (const el of candidates) {
+    // ignore our own badges
+    if (el.classList.contains("trueprice-badge") ||
+        el.hasAttribute(TRUE_PRICE_ATTR)) continue;
 
     const text = el.innerText.trim();
+
+    // sanity checks to avoid false positives
+    if (!text.includes("$")) continue;
+    if ((text.match(/\$/g) || []).length > 1) continue;           // multiple prices → skip
+    if (text.length > 20) continue;                               // too long → skip
+    if (el.querySelector("*")) continue;                          // nested elements → skip (keeps it clean)
+
     const parsed = parsePriceText(text);
-    if (parsed) {
+    if (parsed !== null && parsed >= 0.01) {
       nodes.push({ el, parsed });
-    }
-  }
-
-  // Pass 2: Backup fuzzy scan for sites without selectors
-  const all = root.querySelectorAll("*:not(script):not(style):not(noscript)");
-  for (const el of all) {
-    if (shouldSkip(el)) continue;
-
-    const text = el.textContent && el.textContent.trim();
-    if (!text || text.length > 80) continue;
-
-    if (text.includes("$") || /\d{1,3}(?:[,\.]\d{2})/.test(text)) {
-      const parsed = parsePriceText(text);
-      if (parsed !== null && parsed >= 0.01) {
-        nodes.push({ el, parsed });
-      }
     }
   }
 
@@ -70,8 +75,10 @@ function shouldSkip(el) {
    4. Inject badge WITHOUT shifting layout
 ----------------------------------------------------------- */
 function injectBadge(el, basePrice) {
-  if (el.hasAttribute(TRUE_PRICE_ATTR)) return;
-  el.setAttribute(TRUE_PRICE_ATTR, "1");
+  const parent = el.parentElement;
+
+  if (parent.hasAttribute(TRUE_PRICE_ATTR)) return;
+  parent.setAttribute(TRUE_PRICE_ATTR, "1");
 
   // Create inline badge
   const badge = document.createElement("span");
