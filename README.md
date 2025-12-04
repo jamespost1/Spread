@@ -33,7 +33,7 @@ The extension uses a simple content script (`content.js`) to:
 ## Project Structure
 
 ```
-true-price-extension/
+super-shopper/
 │
 ├── manifest.json          # Chrome extension config
 ├── content.js             # Main logic injected into pages
