@@ -2,20 +2,54 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>TruePrice Options</title>
+  <title>Super Shopper Options</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 16px; max-width: 640px; }
     label { display:block; margin:8px 0 4px; }
     input[type="number"] { width: 120px; }
+    input[type="text"] { width: 100%; max-width: 400px; padding: 6px; }
+    .section { margin: 24px 0; padding: 16px; border: 1px solid #e0e0e0; border-radius: 4px; }
+    .section h3 { margin-top: 0; color: #1976d2; }
+    .help-text { font-size: 12px; color: #666; margin-top: 4px; }
+    a { color: #1976d2; }
   </style>
 </head>
 <body>
-  <h2>TruePrice Options</h2>
-  <label>Default tax rate (as decimal, e.g. 0.08875 = 8.875%)</label>
-  <input id="taxRate" type="number" step="0.0001" min="0" max="1" />
-  <label>Default shipping (USD)</label>
-  <input id="defaultShipping" type="number" step="0.01" min="0" />
-  <label><input id="taxOnShipping" type="checkbox" /> Tax shipping (if your state taxes shipping)</label>
+  <h2>Super Shopper Options</h2>
+  
+  <div class="section">
+    <h3>Price Comparison API (Optional)</h3>
+    <label>Google API Key</label>
+    <input id="googleAPIKey" type="text" placeholder="Enter your Google Custom Search API Key" />
+    <div class="help-text">
+      Get a free API key from <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>.
+      Enable "Custom Search API" for your project.
+    </div>
+    
+    <label style="margin-top: 12px;">Google Custom Search Engine ID</label>
+    <input id="googleSearchEngineId" type="text" placeholder="Enter your Search Engine ID" />
+    <div class="help-text">
+      Create a Custom Search Engine at <a href="https://programmablesearchengine.google.com/" target="_blank">Programmable Search Engine</a>.
+      Set it to search the entire web and enable "Search Google Shopping".
+    </div>
+    
+    <label style="margin-top: 12px;">
+      <input id="enableAPICalls" type="checkbox" checked /> Enable real-time price comparisons
+    </label>
+    <div class="help-text">
+      If disabled, the extension will use sample comparison data.
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>TruePrice Settings</h3>
+    <label>Default tax rate (as decimal, e.g. 0.08875 = 8.875%)</label>
+    <input id="taxRate" type="number" step="0.0001" min="0" max="1" />
+    <label>Default shipping (USD)</label>
+    <input id="defaultShipping" type="number" step="0.01" min="0" />
+    <label><input id="taxOnShipping" type="checkbox" /> Tax shipping (if your state taxes shipping)</label>
+  </div>
+  
   <div style="margin-top:12px;">
     <button id="save">Save</button>
     <span id="status"></span>
