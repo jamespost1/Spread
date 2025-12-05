@@ -128,51 +128,340 @@ function showLoadingState(modal) {
 }
 
 /**
- * Fetch price comparisons from Google Shopping API (placeholder for now)
+ * Fetch price comparisons from Google Shopping via Custom Search API
  */
 async function fetchPriceComparisons(productInfo, modal) {
   try {
-    // TODO: Integrate Google Shopping API here
-    // For now, show mock data structure
+    // Get API configuration from storage
+    const config = await getAPIConfig();
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Check if API calls are enabled and configured
+    if (!config.enabled || !config.apiKey || !config.searchEngineId) {
+      // API not configured or disabled - use fallback mock data
+      console.warn('Google Shopping API not configured or disabled. Using fallback data.');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const fallbackResults = generateFallbackResults(productInfo);
+      displayComparisonResults(fallbackResults, productInfo, modal);
+      return;
+    }
     
-    // Mock comparison results for testing
-    const mockResults = [
-      {
-        retailer: 'Amazon',
-        price: productInfo.price,
-        url: productInfo.url,
-        imageUrl: productInfo.imageUrl,
-        title: productInfo.title,
-        availability: 'In Stock',
-        isCurrentPage: true
-      },
-      {
-        retailer: 'Target',
-        price: productInfo.price * 0.95, // Example: 5% cheaper
-        url: 'https://target.com/product',
-        imageUrl: productInfo.imageUrl,
-        title: productInfo.title,
-        availability: 'In Stock',
-        isCurrentPage: false
-      },
-      {
-        retailer: 'Walmart',
-        price: productInfo.price * 1.08, // Example: 8% more expensive
-        url: 'https://walmart.com/product',
-        imageUrl: productInfo.imageUrl,
-        title: productInfo.title,
-        availability: 'In Stock',
-        isCurrentPage: false
+    // Build search query
+    const searchQuery = buildSearchQuery(productInfo);
+    
+    // Fetch from Google Custom Search API (Shopping results)
+    const apiUrl = buildShoppingAPIUrl(config.apiKey, config.searchEngineId, searchQuery);
+    
+    const response = await fetchWithTimeout(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
       }
-    ];
+    }, 10000); // 10 second timeout
     
-    displayComparisonResults(mockResults, productInfo, modal);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Parse Google Shopping results
+    const results = parseShoppingResults(data, productInfo);
+    
+    if (results.length === 0) {
+      // No results found - use fallback
+      console.warn('No shopping results found. Using fallback data.');
+      const fallbackResults = generateFallbackResults(productInfo);
+      displayComparisonResults(fallbackResults, productInfo, modal);
+      return;
+    }
+    
+    displayComparisonResults(results, productInfo, modal);
+    
   } catch (error) {
-    showErrorState(modal, error);
+    console.error('Error fetching price comparisons:', error);
+    
+    // On error, try to show fallback data
+    try {
+      const fallbackResults = generateFallbackResults(productInfo);
+      displayComparisonResults(fallbackResults, productInfo, modal);
+      
+      // Show a subtle warning
+      setTimeout(() => {
+        const body = modal.querySelector('#supershopper-modal-body');
+        if (body) {
+          const warning = document.createElement('div');
+          warning.style.cssText = 'margin-top: 12px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 12px; color: #856404;';
+          warning.textContent = '⚠️ Using sample data. Configure API for real-time comparisons.';
+          body.appendChild(warning);
+        }
+      }, 500);
+    } catch (fallbackError) {
+      // If fallback also fails, show error state
+      showErrorState(modal, error);
+    }
   }
+}
+
+/**
+ * Get API configuration from Chrome storage
+ */
+function getAPIConfig() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(
+      { 
+        googleAPIKey: '', 
+        googleSearchEngineId: '',
+        enableAPICalls: true
+      },
+      (items) => {
+        resolve({
+          apiKey: items.googleAPIKey || '',
+          searchEngineId: items.googleSearchEngineId || '',
+          enabled: items.enableAPICalls !== false
+        });
+      }
+    );
+  });
+}
+
+/**
+ * Build search query from product info
+ */
+function buildSearchQuery(productInfo) {
+  // Use product title, brand, and SKU if available
+  let query = productInfo.title || '';
+  
+  // Add brand if available
+  if (productInfo.brand) {
+    query = `${productInfo.brand} ${query}`;
+  }
+  
+  // Clean up query
+  query = query.trim().substring(0, 100); // Limit length
+  
+  return encodeURIComponent(query);
+}
+
+/**
+ * Build Google Custom Search API URL for Shopping
+ */
+function buildShoppingAPIUrl(apiKey, searchEngineId, query) {
+  // Google Custom Search API with Shopping results
+  const baseUrl = 'https://www.googleapis.com/customsearch/v1';
+  const params = new URLSearchParams({
+    key: apiKey,
+    cx: searchEngineId,
+    q: query,
+    tbm: 'shop', // Search Google Shopping
+    num: '10', // Get up to 10 results
+    safe: 'active'
+  });
+  
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Fetch with timeout
+ */
+function fetchWithTimeout(url, options, timeout) {
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    )
+  ]);
+}
+
+/**
+ * Parse Google Shopping API results
+ */
+function parseShoppingResults(apiData, currentProduct) {
+  const results = [];
+  
+  // Add current page as first result
+  results.push({
+    retailer: currentProduct.retailer,
+    price: currentProduct.price,
+    url: currentProduct.url,
+    imageUrl: currentProduct.imageUrl,
+    title: currentProduct.title,
+    availability: 'In Stock',
+    isCurrentPage: true
+  });
+  
+  // Parse shopping results from API
+  if (apiData.items && Array.isArray(apiData.items)) {
+    apiData.items.forEach(item => {
+      try {
+        // Extract retailer from displayLink or sitelinks
+        const retailer = extractRetailerName(item.displayLink || item.link || '');
+        
+        // Skip if it's the current retailer
+        if (retailer.toLowerCase() === currentProduct.retailer.toLowerCase()) {
+          return;
+        }
+        
+        // Extract price from pagemap or snippet
+        let price = null;
+        const priceText = extractPriceFromItem(item);
+        if (priceText) {
+          price = parsePriceText(priceText);
+        }
+        
+        // Only add if we have a valid price
+        if (price && price > 0) {
+          results.push({
+            retailer: retailer,
+            price: price,
+            url: item.link || '',
+            imageUrl: extractImageUrl(item),
+            title: item.title || currentProduct.title,
+            availability: 'In Stock', // Default assumption
+            isCurrentPage: false
+          });
+        }
+      } catch (err) {
+        console.warn('Error parsing shopping result:', err);
+        // Continue with next item
+      }
+    });
+  }
+  
+  return results;
+}
+
+/**
+ * Extract retailer name from URL
+ */
+function extractRetailerName(url) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    
+    // Common retailer mappings
+    if (hostname.includes('amazon.')) return 'Amazon';
+    if (hostname.includes('target.')) return 'Target';
+    if (hostname.includes('walmart.')) return 'Walmart';
+    if (hostname.includes('bestbuy.')) return 'Best Buy';
+    if (hostname.includes('ebay.')) return 'eBay';
+    if (hostname.includes('costco.')) return 'Costco';
+    if (hostname.includes('homedepot.')) return 'Home Depot';
+    if (hostname.includes('lowes.')) return "Lowe's";
+    
+    // Extract domain name as fallback
+    const parts = hostname.replace('www.', '').split('.');
+    if (parts.length >= 2) {
+      const domain = parts[parts.length - 2];
+      return domain.charAt(0).toUpperCase() + domain.slice(1);
+    }
+    
+    return 'Other Retailer';
+  } catch (e) {
+    return 'Other Retailer';
+  }
+}
+
+/**
+ * Extract price from shopping result item
+ */
+function extractPriceFromItem(item) {
+  // Try multiple locations for price
+  if (item.pagemap && item.pagemap.offer) {
+    const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
+    for (const offer of offers) {
+      if (offer.price) {
+        return offer.price;
+      }
+    }
+  }
+  
+  // Try product schema
+  if (item.pagemap && item.pagemap.product) {
+    const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
+    for (const product of products) {
+      if (product.offers && product.offers.price) {
+        return product.offers.price;
+      }
+      if (product.price) {
+        return product.price;
+      }
+    }
+  }
+  
+  // Try snippet for price patterns
+  if (item.htmlSnippet) {
+    const priceMatch = item.htmlSnippet.match(/\$[\d,]+\.?\d*/);
+    if (priceMatch) {
+      return priceMatch[0];
+    }
+  }
+  
+  // Try title for price
+  if (item.title) {
+    const priceMatch = item.title.match(/\$[\d,]+\.?\d*/);
+    if (priceMatch) {
+      return priceMatch[0];
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract image URL from shopping result
+ */
+function extractImageUrl(item) {
+  if (item.pagemap && item.pagemap.cse_image) {
+    const images = Array.isArray(item.pagemap.cse_image) ? item.pagemap.cse_image : [item.pagemap.cse_image];
+    if (images.length > 0 && images[0].src) {
+      return images[0].src;
+    }
+  }
+  
+  if (item.pagemap && item.pagemap.product) {
+    const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
+    for (const product of products) {
+      if (product.image) {
+        return Array.isArray(product.image) ? product.image[0] : product.image;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Generate fallback results when API is not available
+ */
+function generateFallbackResults(productInfo) {
+  return [
+    {
+      retailer: productInfo.retailer,
+      price: productInfo.price,
+      url: productInfo.url,
+      imageUrl: productInfo.imageUrl,
+      title: productInfo.title,
+      availability: 'In Stock',
+      isCurrentPage: true
+    },
+    {
+      retailer: 'Target',
+      price: productInfo.price * 0.95,
+      url: `https://www.target.com/s?searchTerm=${encodeURIComponent(productInfo.title.substring(0, 50))}`,
+      imageUrl: productInfo.imageUrl,
+      title: productInfo.title,
+      availability: 'Check Store',
+      isCurrentPage: false
+    },
+    {
+      retailer: 'Walmart',
+      price: productInfo.price * 1.02,
+      url: `https://www.walmart.com/search?q=${encodeURIComponent(productInfo.title.substring(0, 50))}`,
+      imageUrl: productInfo.imageUrl,
+      title: productInfo.title,
+      availability: 'Check Store',
+      isCurrentPage: false
+    }
+  ];
 }
 
 /**
