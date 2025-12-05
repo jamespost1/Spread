@@ -284,8 +284,8 @@ function extractTargetProduct() {
     let upc = null;
     const specs = document.querySelectorAll('[data-test="specifications"] tr, .specifications tr');
     for (const row of specs) {
-      const label = row.querySelector('td:first-child')?.textContent.trim().toLowerCase();
-      const value = row.querySelector('td:last-child')?.textContent.trim();
+      const label = row.querySelector('td:first-child')?.textContent?.trim()?.toLowerCase();
+      const value = row.querySelector('td:last-child')?.textContent?.trim();
       if (label && (label.includes('upc') || label.includes('dpci')) && value) {
         upc = value;
         break;
@@ -404,8 +404,8 @@ function extractWalmartProduct() {
     let upc = null;
     const productInfo = document.querySelectorAll('[data-testid="product-info"] tr, .product-info tr');
     for (const row of productInfo) {
-      const label = row.querySelector('th, td:first-child')?.textContent.trim().toLowerCase();
-      const value = row.querySelector('td:last-child, td:nth-child(2)')?.textContent.trim();
+      const label = row.querySelector('th, td:first-child')?.textContent?.trim()?.toLowerCase();
+      const value = row.querySelector('td:last-child, td:nth-child(2)')?.textContent?.trim();
       if (label && (label.includes('upc') || label.includes('model')) && value) {
         upc = value;
         break;
