@@ -283,9 +283,17 @@ function showErrorState(modal, error) {
     <div class="supershopper-error">
       <p>⚠️ Unable to fetch price comparisons at this time.</p>
       <p class="supershopper-error-detail">${escapeHtml(error.message || 'Please try again later.')}</p>
-      <button class="supershopper-retry-btn" onclick="location.reload()">Retry</button>
+      <button class="supershopper-retry-btn">Retry</button>
     </div>
   `;
+  
+  // Add event listener for retry button (CSP compliant - no inline onclick)
+  const retryBtn = body.querySelector('.supershopper-retry-btn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', () => {
+      location.reload();
+    });
+  }
 }
 
 /**
