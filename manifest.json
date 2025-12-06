@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Super Shopper — Online Shopping Assistant (MVP)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shows 'True Price' next to product prices (shipping + tax).",
   "permissions": [
     "storage",
