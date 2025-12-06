@@ -4,14 +4,14 @@
 
 ---
 
-## Current Features (v0.1.0)
+## Current Features (v0.2.0)
 
-- Automatically detects product prices on retail websites
-- Calculates a **TruePrice** that includes estimated tax and shipping
-- Injects price information directly into product pages
-- Runs entirely client-side; no backend required
-
-*Note: This version focuses on price detection. Price comparison features are coming in v0.2.0.*
+- Automatically detects product pages on supported retailers (Amazon, Target, Walmart)
+- Extracts product information (name, price, SKU, images)
+- Displays a **Compare Prices** button on product pages
+- Fetches price comparisons from Google Shopping API (optional)
+- Shows results in a clean modal with price comparisons and indicators
+- Works entirely client-side; no backend required
 
 ---
 
@@ -33,8 +33,7 @@ The extension uses content scripts to:
 super-shopper/
 │
 ├── manifest.json          # Chrome extension config
-├── content_script.js      # Main logic injected into pages
-├── price_utils.js         # Helper functions for parsing, math, and price logic
+├── price_utils.js         # Helper functions for parsing prices and formatting currency
 ├── product_extractor.js   # Product information extraction (Amazon, Target, Walmart)
 ├── comparison_modal.js    # Price comparison modal UI and logic
 ├── service_worker.js      # Background/service worker for extension events
@@ -147,6 +146,6 @@ The extension will load immediately.
 
 ## Notes
 
-This project is evolving from a TruePrice calculator to a comprehensive price comparison tool. The goal is to help users make informed purchasing decisions by providing accurate, real-time price comparisons across major retailers.
+This project is a comprehensive price comparison tool designed to help users make informed purchasing decisions by providing accurate, real-time price comparisons across major retailers.
 
 The extension is built with simplicity and performance in mind—starting with core functionality and gradually adding advanced features as the foundation stabilizes.
