@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Super Shopper — Online Shopping Assistant (MVP)",
   "version": "0.2.0",
-  "description": "Shows 'True Price' next to product prices (shipping + tax).",
+  "description": "Compare prices across multiple retailers to find the best deals.",
   "permissions": [
     "storage",
     "activeTab",
@@ -22,7 +22,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["price_utils.js", "product_extractor.js", "comparison_modal.js", "content_script.js"],
+      "js": ["price_utils.js", "product_extractor.js", "comparison_modal.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
