@@ -480,7 +480,7 @@ function displayComparisonResults(results, currentProduct, modal) {
     <div class="supershopper-comparison-container">
       <div class="supershopper-product-header">
         <h3 class="supershopper-product-title">${escapeHtml(currentProduct.title)}</h3>
-        ${currentProduct.imageUrl ? `<img src="${escapeHtml(currentProduct.imageUrl)}" alt="${escapeHtml(currentProduct.title)}" class="supershopper-product-image" />` : ''}
+        ${currentProduct.imageUrl ? `<img src="${escapeUrlForAttribute(currentProduct.imageUrl)}" alt="${escapeHtml(currentProduct.title)}" class="supershopper-product-image" />` : ''}
       </div>
       <table class="supershopper-comparison-table">
         <thead>
@@ -542,7 +542,7 @@ function displayComparisonResults(results, currentProduct, modal) {
         <td>
           ${result.isCurrentPage 
             ? '<span class="supershopper-current-badge">You are here</span>' 
-            : `<a href="${escapeHtml(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
+            : `<a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
           }
         </td>
       </tr>
@@ -610,6 +610,16 @@ function escapeHtml(text) {
 }
 
 /**
+ * Escape URL for use in HTML attributes (only escapes quotes, preserves URL structure)
+ */
+function escapeUrlForAttribute(url) {
+  if (!url) return '';
+  // Only escape quotes that would break HTML attributes
+  // Preserve URL structure including query parameters with &
+  return String(url).replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
+/**
  * Initialize comparison functionality for product pages
  */
 function initComparisonFeature() {
@@ -623,8 +633,13 @@ function initComparisonFeature() {
   }
   
   // Also check when DOM changes (for dynamic pages)
+  let checkTimeout;
   const observer = new MutationObserver(() => {
-    checkAndInjectButton();
+    // Debounce: wait for mutations to settle before checking
+    clearTimeout(checkTimeout);
+    checkTimeout = setTimeout(() => {
+      checkAndInjectButton();
+    }, 500);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
