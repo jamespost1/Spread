@@ -1,5 +1,5 @@
 // price_utils.js
-// Shared utilities for parsing price text and computing True Price.
+// Shared utilities for parsing price text and formatting currency.
 
 /**
  * Try to parse the first currency-like number in a string.
@@ -23,17 +23,4 @@ function parsePriceText(text) {
 function formatCurrency(n) {
   if (n == null || isNaN(n)) return "--";
   return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-}
-
-/**
- * Compute true price using basePrice, shipping, taxRate (0.08 for 8%), discount (positive number).
- * taxOnShipping: boolean - whether to include shipping in taxable amount (site dependent)
- */
-function computeTruePrice({ basePrice, shipping = 0, taxRate = 0, discount = 0, taxOnShipping = false }) {
-  if (basePrice == null || isNaN(basePrice)) return null;
-  const taxedBase = Math.max(0, basePrice - Math.max(0, discount));
-  const taxable = taxOnShipping ? (taxedBase + shipping) : taxedBase;
-  const tax = taxable * taxRate;
-  const total = taxedBase + shipping + tax;
-  return { total, tax, shipping, discount };
 }
