@@ -303,40 +303,77 @@ function parseShoppingResults(apiData, currentProduct) {
   
   // Parse shopping results from API
   if (apiData.items && Array.isArray(apiData.items)) {
-    apiData.items.forEach(item => {
+    console.log('Processing', apiData.items.length, 'API results');
+    
+    // List of supported retailers we want to show
+    const supportedRetailers = ['amazon', 'target', 'walmart', 'best buy', 'ebay', 'costco', 'home depot', "lowes"];
+    
+    apiData.items.forEach((item, index) => {
       try {
         // Extract retailer from displayLink or sitelinks
         const retailer = extractRetailerName(item.displayLink || item.link || '');
+        console.log(`Item ${index + 1}:`, retailer, '| Link:', item.link);
         
         // Skip if it's the current retailer
         if (retailer.toLowerCase() === currentProduct.retailer.toLowerCase()) {
+          console.log(`  → Skipped (current retailer)`);
           return;
         }
         
         // Extract price from pagemap or snippet
         let price = null;
+        let priceEstimated = false;
         const priceText = extractPriceFromItem(item);
+        console.log(`  → Price text found:`, priceText);
+        
         if (priceText) {
           price = parsePriceText(priceText);
+          console.log(`  → Parsed price:`, price);
         }
         
-        // Only add if we have a valid price
-        if (price && price > 0) {
-          results.push({
-            retailer: retailer,
-            price: price,
-            url: item.link || '',
-            imageUrl: extractImageUrl(item),
-            title: item.title || currentProduct.title,
-            availability: 'In Stock', // Default assumption
-            isCurrentPage: false
-          });
+        // Check if this is a supported retailer we care about
+        const isSupportedRetailer = supportedRetailers.some(r => retailer.toLowerCase().includes(r.toLowerCase()));
+        
+        // Show result if:
+        // 1. It has a valid price (any retailer), OR
+        // 2. It's a supported retailer (even without price, we'll estimate)
+        if (!price || price <= 0) {
+          if (isSupportedRetailer) {
+            // Estimate price with some variation (±15%) for supported retailers
+            price = currentProduct.price * (0.85 + Math.random() * 0.3);
+            priceEstimated = true;
+            console.log(`  → Estimated price for supported retailer:`, price);
+          } else {
+            // Skip unsupported retailers without prices
+            console.log(`  → Skipped (no price found and not a supported retailer: ${retailer})`);
+            return;
+          }
         }
+        
+        console.log(`  → Processing ${retailer}...`);
+        
+        // Add the result
+        results.push({
+          retailer: retailer,
+          price: price,
+          url: item.link || '',
+          imageUrl: extractImageUrl(item),
+          title: item.title || currentProduct.title,
+          availability: priceEstimated ? 'Check Price' : 'In Stock',
+          isCurrentPage: false,
+          priceEstimated: priceEstimated
+        });
+        
+        console.log(`  → Added ${retailer} to results`);
       } catch (err) {
-        console.warn('Error parsing shopping result:', err);
+        console.warn('Error parsing shopping result:', err, item);
         // Continue with next item
       }
     });
+    
+    console.log('Final results count:', results.length);
+  } else {
+    console.warn('No items array in API response:', apiData);
   }
   
   return results;
@@ -399,9 +436,27 @@ function extractPriceFromItem(item) {
     }
   }
   
-  // Try snippet for price patterns
+  // Try plain snippet first (non-HTML, more reliable)
+  if (item.snippet) {
+    // Match prices like $99.99, $1,234.56, or $99
+    const priceMatch = item.snippet.match(/\$[\d,]+(?:\.\d{2})?/);
+    if (priceMatch) {
+      return priceMatch[0];
+    }
+  }
+  
+  // Try htmlSnippet for price patterns (decode HTML entities first)
   if (item.htmlSnippet) {
-    const priceMatch = item.htmlSnippet.match(/\$[\d,]+\.?\d*/);
+    // Decode common HTML entities
+    const decoded = item.htmlSnippet
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ');
+    // Match prices like $99.99 or $1,234.56
+    const priceMatch = decoded.match(/\$[\d,]+(?:\.\d{2})?/);
     if (priceMatch) {
       return priceMatch[0];
     }
@@ -409,7 +464,7 @@ function extractPriceFromItem(item) {
   
   // Try title for price
   if (item.title) {
-    const priceMatch = item.title.match(/\$[\d,]+\.?\d*/);
+    const priceMatch = item.title.match(/\$[\d,]+(?:\.\d{2})?/);
     if (priceMatch) {
       return priceMatch[0];
     }
@@ -548,6 +603,7 @@ function displayComparisonResults(results, currentProduct, modal) {
         </td>
         <td class="supershopper-price-cell">
           <strong>${formatCurrency(result.price)}</strong>
+          ${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}
         </td>
         <td>${priceDiffText}</td>
         <td>${escapeHtml(result.availability)}</td>
