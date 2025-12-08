@@ -310,9 +310,15 @@ function parseShoppingResults(apiData, currentProduct) {
     
     apiData.items.forEach((item, index) => {
       try {
-        // Extract retailer from displayLink or sitelinks
-        const retailer = extractRetailerName(item.displayLink || item.link || '');
-        console.log(`Item ${index + 1}:`, retailer, '| Link:', item.link);
+        // Extract retailer from link (full URL) - more reliable than displayLink
+        const retailer = extractRetailerName(item.link || item.displayLink || '');
+        console.log(`Item ${index + 1}:`, {
+          retailer: retailer,
+          link: item.link,
+          displayLink: item.displayLink,
+          snippet: item.snippet?.substring(0, 200),
+          hasPrice: !!extractPriceFromItem(item)
+        });
         
         // Skip if it's the current retailer
         if (retailer.toLowerCase() === currentProduct.retailer.toLowerCase()) {
@@ -333,9 +339,9 @@ function parseShoppingResults(apiData, currentProduct) {
         
         // Check if this is a supported retailer we care about
         const isSupportedRetailer = supportedRetailers.some(r => retailer.toLowerCase().includes(r.toLowerCase()));
-        
+
         // Show result if:
-        // 1. It has a valid price (any retailer), OR
+        // 1. It has a valid price (ANY retailer - show all retailers with prices), OR
         // 2. It's a supported retailer (even without price, we'll estimate)
         if (!price || price <= 0) {
           if (isSupportedRetailer) {
@@ -344,9 +350,10 @@ function parseShoppingResults(apiData, currentProduct) {
             priceEstimated = true;
             console.log(`  → Estimated price for supported retailer:`, price);
           } else {
-            // Skip unsupported retailers without prices
-            console.log(`  → Skipped (no price found and not a supported retailer: ${retailer})`);
-            return;
+            // For non-supported retailers without prices, still show them but mark as "Check Price"
+            // This includes retailers like Kohl's, etc.
+            price = null; // Will show as "Check Price" in UI
+            console.log(`  → Adding ${retailer} without price (will show "Check Price")`);
           }
         }
         
@@ -355,13 +362,13 @@ function parseShoppingResults(apiData, currentProduct) {
         // Add the result
         results.push({
           retailer: retailer,
-          price: price,
+          price: price || 0, // Use 0 if no price (we'll display "Check Price" in UI)
           url: item.link || '',
           imageUrl: extractImageUrl(item),
           title: item.title || currentProduct.title,
-          availability: priceEstimated ? 'Check Price' : 'In Stock',
+          availability: (!price || priceEstimated) ? 'Check Price' : 'In Stock',
           isCurrentPage: false,
-          priceEstimated: priceEstimated
+          priceEstimated: priceEstimated || !price
         });
         
         console.log(`  → Added ${retailer} to results`);
@@ -384,27 +391,48 @@ function parseShoppingResults(apiData, currentProduct) {
  */
 function extractRetailerName(url) {
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
+    if (!url) return 'Other Retailer';
     
-    // Common retailer mappings
+    let hostname;
+    
+    // Handle both full URLs and hostnames without protocol
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      hostname = new URL(url).hostname.toLowerCase();
+    } else {
+      // It's just a hostname like "www.amazon.com", use it directly
+      hostname = url.toLowerCase().replace(/^www\./, '');
+    }
+    
+    // Common retailer mappings (check for exact matches first)
     if (hostname.includes('amazon.')) return 'Amazon';
     if (hostname.includes('target.')) return 'Target';
     if (hostname.includes('walmart.')) return 'Walmart';
-    if (hostname.includes('bestbuy.')) return 'Best Buy';
+    if (hostname.includes('bestbuy.') || hostname.includes('best-buy.')) return 'Best Buy';
     if (hostname.includes('ebay.')) return 'eBay';
     if (hostname.includes('costco.')) return 'Costco';
-    if (hostname.includes('homedepot.')) return 'Home Depot';
+    if (hostname.includes('homedepot.') || hostname.includes('home-depot.')) return 'Home Depot';
     if (hostname.includes('lowes.')) return "Lowe's";
+    if (hostname.includes('kohls.') || hostname.includes('kohls')) return "Kohl's";
     
-    // Extract domain name as fallback
-    const parts = hostname.replace('www.', '').split('.');
+    // Extract domain name as fallback (e.g., "www.kohls.com" -> "Kohl's")
+    const parts = hostname.split('.');
     if (parts.length >= 2) {
-      const domain = parts[parts.length - 2];
+      const domain = parts[parts.length - 2]; // e.g., "kohls" from "www.kohls.com"
+      // Capitalize first letter and handle special cases
+      if (domain === 'kohls') return "Kohl's";
       return domain.charAt(0).toUpperCase() + domain.slice(1);
     }
     
     return 'Other Retailer';
   } catch (e) {
+    console.warn('Error extracting retailer from:', url, e);
+    // Try to extract from the string directly if URL parsing fails
+    const match = url.match(/(?:www\.)?([^.]+)\.[^.]+/);
+    if (match && match[1]) {
+      const domain = match[1].toLowerCase();
+      if (domain === 'kohls') return "Kohl's";
+      return domain.charAt(0).toUpperCase() + domain.slice(1);
+    }
     return 'Other Retailer';
   }
 }
@@ -602,8 +630,7 @@ function displayComparisonResults(results, currentProduct, modal) {
           </div>
         </td>
         <td class="supershopper-price-cell">
-          <strong>${formatCurrency(result.price)}</strong>
-          ${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}
+          ${result.price > 0 ? `<strong>${formatCurrency(result.price)}</strong>${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}` : '<span style="color: #666; font-style: italic;">Check Price</span>'}
         </td>
         <td>${priceDiffText}</td>
         <td>${escapeHtml(result.availability)}</td>
