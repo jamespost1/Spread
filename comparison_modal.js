@@ -228,18 +228,30 @@ function getAPIConfig() {
  * Build search query from product info
  */
 function buildSearchQuery(productInfo) {
-  // Use product title, brand, and SKU if available
-  let query = productInfo.title || '';
-  
-  // Add brand if available
+  // Start with just the brand if available
+  let query = '';
   if (productInfo.brand) {
-    query = `${productInfo.brand} ${query}`;
+    query = productInfo.brand;
   }
   
-  // Clean up query
-  query = query.trim().substring(0, 100); // Limit length
+  // Add first few words of product title (brands often already in title)
+  if (productInfo.title) {
+    const titleWords = productInfo.title.split(/\s+/).slice(0, 5).join(' ');
+    // If brand wasn't at start, prepend it
+    if (!productInfo.brand || !productInfo.title.toLowerCase().startsWith(productInfo.brand.toLowerCase())) {
+      query = productInfo.brand ? `${productInfo.brand} ${titleWords}` : titleWords;
+    } else {
+      query = titleWords;
+    }
+  }
   
-  return encodeURIComponent(query);
+  // Clean up: remove special chars that might break search
+  query = query.trim()
+    .replace(/[()]/g, ' ') // Remove parentheses
+    .replace(/\s+/g, ' ') // Multiple spaces to single
+    .substring(0, 60); // Shorter limit
+  
+  return query; // URLSearchParams will handle encoding
 }
 
 /**
