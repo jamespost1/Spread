@@ -72,7 +72,7 @@ The extension will load immediately.
   - Clean, non-intrusive button next to product price
   - Modal popup with price comparison table
   - White and light blue theme
-- ✅ Google Shopping API integration
+- ✅ Google Custom Search API integration
   - Fetch real-time price comparisons
   - Display results with product names and images
 - ✅ Price comparison indicators
