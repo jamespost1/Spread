@@ -305,6 +305,10 @@ function parseShoppingResults(apiData, currentProduct) {
   if (apiData.items && Array.isArray(apiData.items)) {
     console.log('Processing', apiData.items.length, 'API results');
     
+    // Track retailers we've already added to prevent duplicates
+    const addedRetailers = new Set();
+    addedRetailers.add(currentProduct.retailer.toLowerCase()); // Don't duplicate current retailer
+    
     // List of supported retailers we want to show
     const supportedRetailers = ['amazon', 'target', 'walmart', 'best buy', 'ebay', 'costco', 'home depot', "lowes"];
     
@@ -312,22 +316,24 @@ function parseShoppingResults(apiData, currentProduct) {
       try {
         // Extract retailer from link (full URL) - more reliable than displayLink
         const retailer = extractRetailerName(item.link || item.displayLink || '');
-        console.log(`Item ${index + 1}:`, {
-          retailer: retailer,
-          link: item.link,
-          displayLink: item.displayLink,
-          snippet: item.snippet?.substring(0, 200),
-          hasPrice: !!extractPriceFromItem(item)
-        });
+        const retailerKey = retailer.toLowerCase();
+        
+        // Skip if we've already added this retailer (deduplication)
+        if (addedRetailers.has(retailerKey)) {
+          console.log(`Item ${index + 1}: Skipped ${retailer} (duplicate)`);
+          return;
+        }
+        
+        console.log(`Item ${index + 1}:`, retailer, '| Link:', item.link);
         
         // Skip if it's the current retailer
-        if (retailer.toLowerCase() === currentProduct.retailer.toLowerCase()) {
+        if (retailerKey === currentProduct.retailer.toLowerCase()) {
           console.log(`  → Skipped (current retailer)`);
           return;
         }
         
         // Extract price from pagemap or snippet
-        let price = null;
+        let price = null; // Keep as null, not 0
         let priceEstimated = false;
         const priceText = extractPriceFromItem(item);
         console.log(`  → Price text found:`, priceText);
@@ -337,38 +343,46 @@ function parseShoppingResults(apiData, currentProduct) {
           console.log(`  → Parsed price:`, price);
         }
         
+        // Only use price if it's valid
+        if (price <= 0) {
+          price = null;
+        }
+        
         // Check if this is a supported retailer we care about
-        const isSupportedRetailer = supportedRetailers.some(r => retailer.toLowerCase().includes(r.toLowerCase()));
-
+        const isSupportedRetailer = supportedRetailers.some(r => retailerKey.includes(r.toLowerCase()));
+        
         // Show result if:
-        // 1. It has a valid price (ANY retailer - show all retailers with prices), OR
-        // 2. It's a supported retailer (even without price, we'll estimate)
-        if (!price || price <= 0) {
+        // 1. It has a valid price (ANY retailer), OR
+        // 2. It's a supported retailer WITHOUT a price (we'll estimate for supported retailers only)
+        if (!price) {
           if (isSupportedRetailer) {
-            // Estimate price with some variation (±15%) for supported retailers
+            // Estimate price with some variation (±15%) for supported retailers only
             price = currentProduct.price * (0.85 + Math.random() * 0.3);
             priceEstimated = true;
             console.log(`  → Estimated price for supported retailer:`, price);
           } else {
-            // For non-supported retailers without prices, still show them but mark as "Check Price"
-            // This includes retailers like Kohl's, etc.
-            price = null; // Will show as "Check Price" in UI
-            console.log(`  → Adding ${retailer} without price (will show "Check Price")`);
+            // Skip non-supported retailers without prices (don't show "Check Price" - not helpful)
+            console.log(`  → Skipped ${retailer} (no price and not a supported retailer)`);
+            return;
           }
         }
         
+        // Mark retailer as added
+        addedRetailers.add(retailerKey);
+        
         console.log(`  → Processing ${retailer}...`);
         
-        // Add the result
+        // Add the result - keep price as null if no price, don't convert to 0
         results.push({
           retailer: retailer,
-          price: price || 0, // Use 0 if no price (we'll display "Check Price" in UI)
+          price: price, // null if no price, actual number otherwise
           url: item.link || '',
           imageUrl: extractImageUrl(item),
           title: item.title || currentProduct.title,
-          availability: (!price || priceEstimated) ? 'Check Price' : 'In Stock',
+          availability: priceEstimated ? 'Estimated' : (price ? 'In Stock' : 'Check Price'),
           isCurrentPage: false,
-          priceEstimated: priceEstimated || !price
+          priceEstimated: priceEstimated,
+          hasPrice: !!price // Helper flag
         });
         
         console.log(`  → Added ${retailer} to results`);
@@ -591,14 +605,30 @@ function displayComparisonResults(results, currentProduct, modal) {
   `;
   
   sortedResults.forEach(result => {
-    const priceDiff = result.price - currentPrice;
-    const priceDiffPercent = ((priceDiff / currentPrice) * 100).toFixed(1);
-    const isBetter = priceDiff < 0;
-    const isSame = Math.abs(priceDiff) < 0.01;
+    // Skip price difference calculation if result has no price
+    const hasValidPrice = result.price !== null && result.price > 0;
+    
+    let priceDiff = 0;
+    let priceDiffPercent = 0;
+    let isBetter = false;
+    let isSame = false;
+    
+    if (hasValidPrice) {
+      priceDiff = result.price - currentPrice;
+      priceDiffPercent = ((priceDiff / currentPrice) * 100).toFixed(1);
+      isBetter = priceDiff < 0;
+      isSame = Math.abs(priceDiff) < 0.01;
+    }
     
     let indicator = '';
     let indicatorClass = '';
-    if (isSame || result.isCurrentPage) {
+    if (result.isCurrentPage) {
+      indicator = '✓';
+      indicatorClass = 'same';
+    } else if (!hasValidPrice) {
+      indicator = '?';
+      indicatorClass = 'same'; // Neutral indicator for unknown prices
+    } else if (isSame) {
       indicator = '✓';
       indicatorClass = 'same';
     } else if (isBetter) {
@@ -612,6 +642,8 @@ function displayComparisonResults(results, currentProduct, modal) {
     let priceDiffText = '';
     if (result.isCurrentPage) {
       priceDiffText = '<span class="supershopper-current-badge">Current Page</span>';
+    } else if (!hasValidPrice) {
+      priceDiffText = '<span class="supershopper-price-diff same" style="color: #666;">Price not available</span>';
     } else if (isSame) {
       priceDiffText = '<span class="supershopper-price-diff same">Same price</span>';
     } else {
@@ -630,7 +662,7 @@ function displayComparisonResults(results, currentProduct, modal) {
           </div>
         </td>
         <td class="supershopper-price-cell">
-          ${result.price > 0 ? `<strong>${formatCurrency(result.price)}</strong>${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}` : '<span style="color: #666; font-style: italic;">Check Price</span>'}
+          ${hasValidPrice ? `<strong>${formatCurrency(result.price)}</strong>${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}` : '<span style="color: #666; font-style: italic;">Check Price</span>'}
         </td>
         <td>${priceDiffText}</td>
         <td>${escapeHtml(result.availability)}</td>
