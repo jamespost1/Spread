@@ -321,12 +321,34 @@ function parseShoppingResults(apiData, currentProduct) {
     apiData.items.forEach((item, index) => {
       try {
         // Filter out non-commerce domains (.org, .edu, .gov, etc.)
-        // This prevents charities, schools, and government sites from appearing as retailers
+        // Also filter out non-US country-specific domains and subdomains
         const url = (item.link || item.displayLink || '').toLowerCase();
         if (url.includes('.org/') || url.includes('.edu/') || url.includes('.gov/') || 
             url.includes('.org') && !url.includes('search')) { // stricter .org check
            console.log(`Item ${index + 1}: Skipped ${url} (non-commerce domain)`);
            return;
+        }
+        
+        // Filter out non-US country-specific domains (e.g., .com.ph, .com.au, .co.uk, .ca)
+        // Also check for country subdomains (e.g., amazon.co.uk, amazon.com.au)
+        const nonUSDomains = [
+          '.com.ph', '.com.au', '.co.uk', '.com.br', '.com.mx', '.ca', '.co.jp', '.fr', '.de',
+          '.it', '.es', '.nl', '.com.sg', '.com.hk', '.co.in', '.com.tr', '.com.ar',
+          '.co.za', '.com.tw', '.com.cn', '.ae', '.sa'
+        ];
+        const isNonUSDomain = nonUSDomains.some(domain => url.includes(domain));
+        if (isNonUSDomain) {
+          console.log(`Item ${index + 1}: Skipped ${url} (non-US domain)`);
+          return;
+        }
+        
+        // Also check for country-specific hostnames (e.g., amazon.co.uk, walmart.ca)
+        const hostname = url.match(/https?:\/\/([^/]+)/)?.[1] || '';
+        if (hostname && (hostname.endsWith('.co.uk') || hostname.endsWith('.com.au') || 
+            hostname.endsWith('.com.ph') || hostname.endsWith('.ca') || 
+            hostname.match(/\.(ph|au|uk|br|mx|jp|fr|de|it|es|nl|sg|hk|in|tr|ar|za|tw|cn|ae|sa)$/))) {
+          console.log(`Item ${index + 1}: Skipped ${url} (non-US country domain)`);
+          return;
         }
 
         // Extract retailer from link (full URL) - more reliable than displayLink
@@ -350,17 +372,27 @@ function parseShoppingResults(apiData, currentProduct) {
         // Extract price from pagemap or snippet
         let price = null; // Keep as null, not 0
         let priceEstimated = false;
-        // Pass current price as reference to help pick the best match
+        // Pass current price as reference to help pick the best match and validate
         const priceText = extractPriceFromItem(item, currentProduct.price);
         console.log(`  → Price text found:`, priceText);
         
         if (priceText) {
-          price = parsePriceText(priceText);
+          price = parsePriceTextUSDOnly(priceText);
           console.log(`  → Parsed price:`, price);
+          
+          // Validate price is reasonable (within 50x of reference price to filter out currency errors)
+          // This catches cases like Philippines peso showing as $2400 instead of actual USD
+          if (price && currentProduct.price) {
+            const ratio = price / currentProduct.price;
+            if (ratio > 50 || ratio < 0.01) {
+              console.log(`  → Price ${price} seems invalid (ratio: ${ratio.toFixed(2)}), rejecting`);
+              price = null;
+            }
+          }
         }
         
         // Only use price if it's valid
-        if (price <= 0) {
+        if (price <= 0 || !price) {
           price = null;
         }
         
@@ -455,50 +487,111 @@ function extractRetailerName(url) {
 }
 
 /**
- * Extract price from shopping result item
+ * Parse price text - USD ONLY (strict $ symbol required)
+ * This prevents currency confusion (e.g., PHP peso showing as $2400)
+ */
+function parsePriceTextUSDOnly(text) {
+  if (!text || typeof text !== "string") return null;
+  
+  // Only accept prices with $ symbol (USD)
+  // Reject other currency symbols: £, €, ¥, ₱, etc.
+  const usdPriceRegex = /\$\s*([0-9]{1,3}(?:[, \u00A0][0-9]{3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)/;
+  const match = text.match(usdPriceRegex);
+  
+  if (!match || !match[1]) return null;
+  
+  // Remove commas and spaces
+  const cleaned = match[1].replace(/[, \u00A0]/g, "");
+  const value = parseFloat(cleaned);
+  
+  if (isNaN(value) || value <= 0) return null;
+  return value;
+}
+
+/**
+ * Extract price from shopping result item - USD ONLY
  */
 function extractPriceFromItem(item, referencePrice = null) {
   // 1. Try Structured Data (Rich Snippets) - Most Reliable
   if (item.pagemap) {
-    // Try offer/product schemas
+    // Try offer/product schemas - check for USD currency
     if (item.pagemap.offer) {
       const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
       for (const offer of offers) {
-        if (offer.price) return offer.price;
+        // Check if currency is USD
+        if (offer.price && (offer.priceCurrency === 'USD' || !offer.priceCurrency || offer.priceCurrency === '')) {
+          const priceStr = String(offer.price);
+          // If it has $, parse it; otherwise assume it's a number
+          if (priceStr.includes('$')) {
+            return priceStr;
+          } else {
+            // Structured data often provides just the number, prepend $
+            return `$${priceStr}`;
+          }
+        }
       }
     }
     if (item.pagemap.product) {
       const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
       for (const product of products) {
-        if (product.offers && product.offers.price) return product.offers.price;
-        if (product.price) return product.price;
+        if (product.offers && product.offers.price) {
+          const priceCurrency = product.offers.priceCurrency || product.priceCurrency || '';
+          if (priceCurrency === 'USD' || !priceCurrency) {
+            const priceStr = String(product.offers.price);
+            return priceStr.includes('$') ? priceStr : `$${priceStr}`;
+          }
+        }
+        if (product.price) {
+          const priceStr = String(product.price);
+          // Try to validate it's reasonable if we have reference
+          if (referencePrice) {
+            const val = parseFloat(priceStr.replace(/[$,]/g, ''));
+            if (!isNaN(val) && val > 0 && val / referencePrice < 50 && val / referencePrice > 0.01) {
+              return priceStr.includes('$') ? priceStr : `$${priceStr}`;
+            }
+          } else {
+            return priceStr.includes('$') ? priceStr : `$${priceStr}`;
+          }
+        }
       }
     }
     
-    // NEW: Try Open Graph / Metatags (Common in many retailers)
+    // Try Open Graph / Metatags (Common in many retailers)
     if (item.pagemap.metatags) {
       const tags = Array.isArray(item.pagemap.metatags) ? item.pagemap.metatags : [item.pagemap.metatags];
       for (const tag of tags) {
-        if (tag['og:price:amount']) return tag['og:price:amount'];
-        if (tag['product:price:amount']) return tag['product:price:amount'];
-        if (tag['twitter:data1'] && tag['twitter:label1'] === 'Price') return tag['twitter:data1'];
+        // Check for USD currency
+        if (tag['og:price:currency'] && tag['og:price:currency'] !== 'USD') continue;
+        if (tag['product:price:currency'] && tag['product:price:currency'] !== 'USD') continue;
+        
+        if (tag['og:price:amount']) {
+          const priceStr = String(tag['og:price:amount']);
+          return priceStr.includes('$') ? priceStr : `$${priceStr}`;
+        }
+        if (tag['product:price:amount']) {
+          const priceStr = String(tag['product:price:amount']);
+          return priceStr.includes('$') ? priceStr : `$${priceStr}`;
+        }
+        if (tag['twitter:data1'] && tag['twitter:label1'] === 'Price' && tag['twitter:data1'].includes('$')) {
+          return tag['twitter:data1'];
+        }
       }
     }
   }
 
-  // 2. Text Extraction Strategy
+  // 2. Text Extraction Strategy - STRICT USD ONLY ($ symbol required)
   // Combine title and snippet for search
-  const textToSearch = (item.title + " " + (item.snippet || "")).replace(/\s+/g, " ");
+  const textToSearch = (item.title + " " + (item.snippet || "") + " " + (item.htmlSnippet || "")).replace(/\s+/g, " ");
   
-  // Regex to find prices: $X.XX or $XX
-  // Capture group 1: The amount
-  // Negative lookahead (?!) to avoid "off", "discount", "saved" immediately after
-  const priceRegex = /\$([0-9,]+(?:\.[0-9]{2})?)(?!\s*(?:off|discount|saved|cash back))/gi;
+  // STRICT regex: ONLY match prices with $ symbol (USD)
+  // Negative lookahead to avoid "off", "discount", "saved" immediately after
+  // Also avoid prices that look like dates or other numbers
+  const priceRegex = /\$\s*([0-9]{1,3}(?:[,][0-9]{3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)(?!\s*(?:off|discount|saved|cash back|shipping|tax))/gi;
   
   const matches = [...textToSearch.matchAll(priceRegex)];
   
   if (matches.length > 0) {
-    const candidates = matches.map(m => m[0]); // Get the full strings "$10.00"
+    const candidates = matches.map(m => m[0].trim()); // Get the full strings "$10.00"
     
     // If we have a reference price, pick the candidate closest to it
     if (referencePrice && candidates.length > 1) {
@@ -506,8 +599,12 @@ function extractPriceFromItem(item, referencePrice = null) {
       let minDiff = Number.MAX_VALUE;
       
       for (const candidate of candidates) {
-        const val = parsePriceText(candidate);
-        if (val !== null) {
+        const val = parsePriceTextUSDOnly(candidate);
+        if (val !== null && val > 0) {
+          // Reject prices that are way off (currency confusion)
+          const ratio = val / referencePrice;
+          if (ratio > 50 || ratio < 0.01) continue;
+          
           const diff = Math.abs(val - referencePrice);
           if (diff < minDiff) {
             minDiff = diff;
@@ -524,11 +621,12 @@ function extractPriceFromItem(item, referencePrice = null) {
   // Fallback: Try decoding HTML snippet if simple regex failed
   if (item.htmlSnippet) {
     const decoded = item.htmlSnippet
-      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/&#36;/g, '$'); // Decode $ entity
       
     const matchesHtml = [...decoded.matchAll(priceRegex)];
     if (matchesHtml.length > 0) {
-      return matchesHtml[0][0];
+      return matchesHtml[0][0].trim();
     }
   }
   
