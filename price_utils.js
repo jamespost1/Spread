@@ -22,5 +22,11 @@ function parsePriceText(text) {
 
 function formatCurrency(n) {
   if (n == null || isNaN(n)) return "--";
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+  // Always show 2 decimal places for currency
+  return n.toLocaleString(undefined, { 
+    style: "currency", 
+    currency: "USD", 
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2 
+  });
 }
