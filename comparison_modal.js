@@ -820,8 +820,9 @@ function generateFallbackResults(productInfo) {
 /**
  * Calculate title similarity to determine if products are the same or similar
  * Returns a score between 0 and 1 (1 = identical, 0 = completely different)
+ * Improved to better detect same products vs similar ones
  */
-function calculateTitleSimilarity(title1, title2) {
+function calculateTitleSimilarity(title1, title2, currentProduct = null) {
   if (!title1 || !title2) return 0;
   
   const normalize = (str) => str.toLowerCase()
@@ -837,26 +838,79 @@ function calculateTitleSimilarity(title1, title2) {
   
   // Check if one contains the other (likely same product with different description)
   if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
-    return 0.9;
+    return 0.95; // Same product, just different description length
   }
   
-  // Extract key words (first 5-6 words, brand/model numbers)
-  const words1 = normalized1.split(/\s+/).slice(0, 6);
-  const words2 = normalized2.split(/\s+/).slice(0, 6);
+  // Extract brand from current product if available
+  let brand = null;
+  if (currentProduct && currentProduct.brand) {
+    brand = normalize(currentProduct.brand);
+  } else {
+    // Try to extract brand from title (usually first word or two)
+    const firstWords = normalized1.split(/\s+/).slice(0, 2).join(' ');
+    brand = firstWords;
+  }
   
-  // Count matching words
-  const set1 = new Set(words1);
-  const set2 = new Set(words2);
+  // Check if both titles contain the brand (strong indicator of same product)
+  const hasBrand1 = brand && normalized1.includes(brand);
+  const hasBrand2 = brand && normalized2.includes(brand);
+  const bothHaveBrand = hasBrand1 && hasBrand2;
+  
+  // Extract model numbers / product codes (alphanumeric sequences)
+  const extractCodes = (str) => {
+    // Match patterns like: SX1234, DR-1234, 123456, etc.
+    return str.match(/\b[A-Z0-9]{3,}[-\s]?[A-Z0-9]{2,}\b/gi) || [];
+  };
+  
+  const codes1 = extractCodes(title1);
+  const codes2 = extractCodes(title2);
+  
+  // If same model codes exist, it's the same product
+  if (codes1.length > 0 && codes2.length > 0) {
+    const matchingCodes = codes1.some(code1 => 
+      codes2.some(code2 => normalize(code1) === normalize(code2))
+    );
+    if (matchingCodes) {
+      return 0.95; // Same product code/model number
+    }
+  }
+  
+  // Extract key product words (exclude common words)
+  const commonWords = new Set(['the', 'and', 'or', 'for', 'with', 'pack', 'pairs', 'pair', 'set', 'bundle']);
+  const extractKeyWords = (str) => {
+    return str.split(/\s+/)
+      .filter(word => word.length > 2 && !commonWords.has(word))
+      .slice(0, 8); // First 8 meaningful words
+  };
+  
+  const keywords1 = extractKeyWords(normalized1);
+  const keywords2 = extractKeyWords(normalized2);
+  
+  // Count matching keywords
+  const set1 = new Set(keywords1);
+  const set2 = new Set(keywords2);
   let matches = 0;
   for (const word of set1) {
-    if (set2.has(word) && word.length > 2) { // Ignore short words
+    if (set2.has(word)) {
       matches++;
     }
   }
   
-  // Calculate similarity as ratio of matching words to total unique words
-  const totalUnique = new Set([...words1, ...words2]).size;
-  return matches / totalUnique;
+  // Calculate base similarity
+  const totalUnique = new Set([...keywords1, ...keywords2]).size;
+  let similarity = totalUnique > 0 ? matches / totalUnique : 0;
+  
+  // Boost similarity if both have the brand
+  if (bothHaveBrand && similarity > 0.3) {
+    similarity = Math.min(0.95, similarity + 0.2);
+  }
+  
+  // If high keyword overlap and both have brand, treat as same product
+  if (bothHaveBrand && matches >= 4 && similarity > 0.5) {
+    similarity = Math.max(0.85, similarity);
+  }
+  
+  return similarity;
 }
 
 /**
@@ -875,11 +929,12 @@ function displayComparisonResults(results, currentProduct, modal) {
       // Current page always goes in "same" group
       sameProducts.push(result);
     } else {
-      // Calculate similarity to current product
-      const similarity = calculateTitleSimilarity(currentProduct.title, result.title);
+      // Calculate similarity to current product (pass currentProduct for brand matching)
+      const similarity = calculateTitleSimilarity(currentProduct.title, result.title, currentProduct);
       
-      // Threshold: > 0.6 = same product, <= 0.6 = similar product
-      if (similarity > 0.6) {
+      // Higher threshold (0.75) to be more strict about "same product"
+      // This prevents same products from appearing in "similar" section
+      if (similarity > 0.75) {
         sameProducts.push({ ...result, similarity });
       } else {
         similarProducts.push({ ...result, similarity });
