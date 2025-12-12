@@ -350,6 +350,36 @@ function parseShoppingResults(apiData, currentProduct) {
           console.log(`Item ${index + 1}: Skipped ${url} (non-US country domain)`);
           return;
         }
+        
+        // Filter out non-retailer sites (social media, forums, Wikipedia, etc.)
+        const nonRetailerDomains = [
+          'reddit.com', 'redd.it',
+          'facebook.com', 'fb.com',
+          'twitter.com', 'x.com',
+          'instagram.com',
+          'pinterest.com',
+          'tiktok.com',
+          'youtube.com', 'youtu.be',
+          'wikipedia.org', 'wikimedia.org',
+          'quora.com',
+          'medium.com',
+          'linkedin.com',
+          'tumblr.com',
+          'blogspot.com', 'blogger.com',
+          'wordpress.com',
+          'yahoo.com', 'yahoo.co',
+          'buzzfeed.com',
+          'cnn.com', 'bbc.com', 'nytimes.com', 'washingtonpost.com', 'wsj.com', 'usatoday.com',
+          'theverge.com', 'techcrunch.com', 'engadget.com', 'arstechnica.com',
+          'amazon.com/review', 'amazon.com/customer-reviews',
+          'amazon.com/product-reviews'
+        ];
+        
+        const isNonRetailer = nonRetailerDomains.some(domain => hostname.includes(domain) || url.includes(domain));
+        if (isNonRetailer) {
+          console.log(`Item ${index + 1}: Skipped ${url} (non-retailer site)`);
+          return;
+        }
 
         // Extract retailer from link (full URL) - more reliable than displayLink
         const retailer = extractRetailerName(item.link || item.displayLink || '');
