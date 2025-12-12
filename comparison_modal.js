@@ -441,16 +441,45 @@ function parseShoppingResults(apiData, currentProduct) {
           return;
         }
         
-        // ACCEPT if it matches product page patterns OR is from known retailers
+        // Filter out app store links (iOS App Store, Google Play Store, etc.)
+        if (url.includes('apps.apple.com') || url.includes('play.google.com') || url.includes('app-store') || url.includes('/app/') && !url.includes('/product')) {
+          console.log(`Item ${index + 1}: Skipped ${url} (app store link)`);
+          return;
+        }
+        
+        // Filter out root/homepage URLs (these aren't product pages)
+        // Check if URL is just domain or domain with only trailing slash
+        const urlPath = url.match(/https?:\/\/[^\/]+\/(.*)/)?.[1] || '';
+        if (!urlPath || urlPath.trim() === '' || urlPath === '/') {
+          console.log(`Item ${index + 1}: Skipped ${url} (homepage/root URL)`);
+          return;
+        }
+        
+        // ACCEPT if it matches product page patterns
+        // For known retailers (especially brand sites), we still require product page patterns
         const knownRetailerDomains = ['amazon.com', 'target.com', 'walmart.com', 'bestbuy.com', 
           'ebay.com', 'costco.com', 'homedepot.com', 'lowes.com', 'kohls.com', 'macys.com',
-          'newegg.com', 'staples.com', 'officedepot.com', 'jbl.com', 'nike.com', 'apple.com',
-          'samsung.com', 'sony.com', 'dell.com'];
+          'newegg.com', 'staples.com', 'officedepot.com'];
         const isKnownRetailer = knownRetailerDomains.some(domain => hostname.includes(domain));
         
-        if (!isProductPage && !isKnownRetailer) {
-          console.log(`Item ${index + 1}: Skipped ${url} (not a product page and not known retailer)`);
-          return;
+        // Brand websites need to have product page patterns too
+        const brandDomains = ['jbl.com', 'nike.com', 'apple.com', 'samsung.com', 'sony.com', 'dell.com'];
+        const isBrandSite = brandDomains.some(domain => hostname.includes(domain));
+        
+        // Only accept if:
+        // 1. It matches product page patterns, OR
+        // 2. It's a known retailer (Amazon, Target, etc.) - they usually have good product URLs
+        // But reject brand sites that don't match product page patterns (they often link to homepages)
+        if (!isProductPage) {
+          if (isBrandSite) {
+            // Brand sites must have product page patterns
+            console.log(`Item ${index + 1}: Skipped ${url} (brand site without product page pattern)`);
+            return;
+          }
+          if (!isKnownRetailer) {
+            console.log(`Item ${index + 1}: Skipped ${url} (not a product page and not known retailer)`);
+            return;
+          }
         }
 
         // Extract retailer from link (full URL) - more reliable than displayLink
