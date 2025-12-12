@@ -251,7 +251,8 @@ function buildSearchQuery(productInfo) {
     .replace(/\s+/g, ' ') // Multiple spaces to single
     .substring(0, 60); // Shorter limit
   
-  return query; // URLSearchParams will handle encoding
+  // Append "price" to ensure we get shopping results and not just info pages
+  return `${query} price`; 
 }
 
 /**
@@ -310,10 +311,24 @@ function parseShoppingResults(apiData, currentProduct) {
     addedRetailers.add(currentProduct.retailer.toLowerCase()); // Don't duplicate current retailer
     
     // List of supported retailers we want to show
-    const supportedRetailers = ['amazon', 'target', 'walmart', 'best buy', 'ebay', 'costco', 'home depot', "lowes"];
+    // Added major brands and category-specific stores
+    const supportedRetailers = [
+      'amazon', 'target', 'walmart', 'best buy', 'ebay', 'costco', 'home depot', "lowes",
+      'jbl', 'nike', 'apple', 'samsung', 'sony', 'dell', 'hp', 'microsoft', 'lego', 'wayfair',
+      'chewy', 'gamestop', 'newegg', 'b&h', 'staples', 'office depot', 'kohls', 'macys'
+    ];
     
     apiData.items.forEach((item, index) => {
       try {
+        // Filter out non-commerce domains (.org, .edu, .gov, etc.)
+        // This prevents charities, schools, and government sites from appearing as retailers
+        const url = (item.link || item.displayLink || '').toLowerCase();
+        if (url.includes('.org/') || url.includes('.edu/') || url.includes('.gov/') || 
+            url.includes('.org') && !url.includes('search')) { // stricter .org check
+           console.log(`Item ${index + 1}: Skipped ${url} (non-commerce domain)`);
+           return;
+        }
+
         // Extract retailer from link (full URL) - more reliable than displayLink
         const retailer = extractRetailerName(item.link || item.displayLink || '');
         const retailerKey = retailer.toLowerCase();
@@ -349,24 +364,11 @@ function parseShoppingResults(apiData, currentProduct) {
           price = null;
         }
         
-        // Check if this is a supported retailer we care about
-        const isSupportedRetailer = supportedRetailers.some(r => retailerKey.includes(r.toLowerCase()));
+        // REMOVED: No more price estimation - only show retailers with real prices
+        // OR show all retailers but mark price as unknown
         
-        // Show result if:
-        // 1. It has a valid price (ANY retailer), OR
-        // 2. It's a supported retailer WITHOUT a price (we'll estimate for supported retailers only)
-        if (!price) {
-          if (isSupportedRetailer) {
-            // Estimate price with some variation (±15%) for supported retailers only
-            price = currentProduct.price * (0.85 + Math.random() * 0.3);
-            priceEstimated = true;
-            console.log(`  → Estimated price for supported retailer:`, price);
-          } else {
-            // Skip non-supported retailers without prices (don't show "Check Price" - not helpful)
-            console.log(`  → Skipped ${retailer} (no price and not a supported retailer)`);
-            return;
-          }
-        }
+        // Show ALL retailers, even without prices (user can check themselves)
+        // No filtering based on supported retailers anymore - show everything we find
         
         // Mark retailer as added
         addedRetailers.add(retailerKey);
@@ -380,9 +382,9 @@ function parseShoppingResults(apiData, currentProduct) {
           url: item.link || '',
           imageUrl: extractImageUrl(item),
           title: item.title || currentProduct.title,
-          availability: priceEstimated ? 'Estimated' : (price ? 'In Stock' : 'Check Price'),
+          availability: price ? 'In Stock' : 'Check Availability',
           isCurrentPage: false,
-          priceEstimated: priceEstimated,
+          priceEstimated: false, // Never estimate - removed this feature
           hasPrice: !!price // Helper flag
         });
         
@@ -598,8 +600,14 @@ function displayComparisonResults(results, currentProduct, modal) {
   const body = modal.querySelector('#supershopper-modal-body');
   if (!body) return;
   
-  // Sort results by price (cheapest first)
-  const sortedResults = [...results].sort((a, b) => a.price - b.price);
+  // Sort results by price (cheapest first).
+  // Items with null price (Check Price) go to the bottom.
+  const sortedResults = [...results].sort((a, b) => {
+    if (a.price === null && b.price === null) return 0;
+    if (a.price === null) return 1;
+    if (b.price === null) return -1;
+    return a.price - b.price;
+  });
   const currentPrice = currentProduct.price;
   
   // Create comparison table
@@ -680,7 +688,7 @@ function displayComparisonResults(results, currentProduct, modal) {
           </div>
         </td>
         <td class="supershopper-price-cell">
-          ${hasValidPrice ? `<strong>${formatCurrency(result.price)}</strong>${result.priceEstimated ? '<span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">(estimated)</span>' : ''}` : '<span style="color: #666; font-style: italic;">Check Price</span>'}
+          ${hasValidPrice ? `<strong>${formatCurrency(result.price)}</strong>` : '<span style="color: #666; font-style: italic;">Can\'t grab price</span>'}
         </td>
         <td>${priceDiffText}</td>
         <td>${escapeHtml(result.availability)}</td>
