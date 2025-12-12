@@ -471,138 +471,24 @@ function parseShoppingResults(apiData, currentProduct) {
           return;
         }
         
-        // Extract price - PRIORITIZE structured data, text extraction is fallback only
-        let price = null;
-        let priceText = null;
-        
-        // FIRST: Try structured data ONLY (most reliable for accurate prices)
-        if (item.pagemap) {
-          // Try offer/product schemas - check for USD currency
-          if (item.pagemap.offer) {
-            const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
-            for (const offer of offers) {
-              if (offer.price && (offer.priceCurrency === 'USD' || !offer.priceCurrency || offer.priceCurrency === '')) {
-                const priceStr = String(offer.price);
-                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                console.log(`  → Found price in structured data (offer): ${priceText}`);
-                break;
-              }
-            }
-          }
-          
-          if (!priceText && item.pagemap.product) {
-            const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
-            for (const product of products) {
-              if (product.offers && product.offers.price) {
-                const priceCurrency = product.offers.priceCurrency || product.priceCurrency || '';
-                if (priceCurrency === 'USD' || !priceCurrency) {
-                  const priceStr = String(product.offers.price);
-                  priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                  console.log(`  → Found price in structured data (product.offers): ${priceText}`);
-                  break;
-                }
-              }
-              if (!priceText && product.price) {
-                const priceStr = String(product.price);
-                // Validate it's reasonable if we have reference
-                if (currentProduct.price) {
-                  const val = parseFloat(priceStr.replace(/[$,]/g, ''));
-                  if (!isNaN(val) && val > 0 && val / currentProduct.price < 50 && val / currentProduct.price > 0.01) {
-                    priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                    console.log(`  → Found price in structured data (product): ${priceText}`);
-                    break;
-                  }
-                } else {
-                  priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                  console.log(`  → Found price in structured data (product): ${priceText}`);
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Try Open Graph / Metatags
-          if (!priceText && item.pagemap.metatags) {
-            const tags = Array.isArray(item.pagemap.metatags) ? item.pagemap.metatags : [item.pagemap.metatags];
-            for (const tag of tags) {
-              // Check for USD currency
-              if (tag['og:price:currency'] && tag['og:price:currency'] !== 'USD') continue;
-              if (tag['product:price:currency'] && tag['product:price:currency'] !== 'USD') continue;
-              
-              if (tag['og:price:amount']) {
-                const priceStr = String(tag['og:price:amount']);
-                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                console.log(`  → Found price in structured data (og:price:amount): ${priceText}`);
-                break;
-              }
-              if (tag['product:price:amount']) {
-                const priceStr = String(tag['product:price:amount']);
-                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
-                console.log(`  → Found price in structured data (product:price:amount): ${priceText}`);
-                break;
-              }
-              if (tag['twitter:data1'] && tag['twitter:label1'] === 'Price' && tag['twitter:data1'].includes('$')) {
-                priceText = tag['twitter:data1'];
-                console.log(`  → Found price in structured data (twitter): ${priceText}`);
-                break;
-              }
-            }
-          }
-        }
-        
-        // FALLBACK: Only if structured data fails, try text extraction as last resort
-        if (!priceText) {
-          console.log(`  → No structured data found, trying text extraction...`);
-          priceText = extractPriceFromItemTextOnly(item, currentProduct.price);
-          if (priceText) {
-            console.log(`  → Found price in text (fallback): ${priceText}`);
-          }
-        }
-        
-        console.log(`  → Price text found:`, priceText);
-        
-        if (priceText) {
-          price = parsePriceTextUSDOnly(priceText);
-          console.log(`  → Parsed price:`, price);
-          
-          // Validate price is reasonable (within 50x of reference price to filter out currency errors)
-          // This catches cases like Philippines peso showing as $2400 instead of actual USD
-          if (price && currentProduct.price) {
-            const ratio = price / currentProduct.price;
-            if (ratio > 50 || ratio < 0.01) {
-              console.log(`  → Price ${price} seems invalid (ratio: ${ratio.toFixed(2)}), rejecting`);
-              price = null;
-            }
-          }
-        }
-        
-        // Only use price if it's valid
-        if (price <= 0 || !price) {
-          price = null;
-        }
-        
-        // REMOVED: No more price estimation - only show retailers with real prices
-        // OR show all retailers but mark price as unknown
-        
-        // Show ALL retailers, even without prices (user can check themselves)
-        // No filtering based on supported retailers anymore - show everything we find
+        // REMOVED: All price extraction logic - focus on retailer discovery only
         
         // Mark retailer as added
         addedRetailers.add(retailerKey);
         
         console.log(`  → Processing ${retailer}...`);
         
-        // Add the result - keep price as null if no price, don't convert to 0
+        // Extract product info from API result
+        const resultTitle = item.title || currentProduct.title;
+        const resultImageUrl = extractImageUrl(item);
+        
+        // Add the result - no price data
         results.push({
           retailer: retailer,
-          price: price, // null if no price, actual number otherwise
           url: item.link || '',
-          imageUrl: extractImageUrl(item),
-          title: item.title || currentProduct.title,
-          availability: price ? 'In Stock' : 'Check Availability',
-          isCurrentPage: false,
-          priceEstimated: false, // Never estimate - removed this feature
-          hasPrice: !!price // Helper flag
+          imageUrl: resultImageUrl,
+          title: resultTitle,
+          isCurrentPage: false
         });
         
         console.log(`  → Added ${retailer} to results`);
@@ -932,119 +818,156 @@ function generateFallbackResults(productInfo) {
 }
 
 /**
+ * Calculate title similarity to determine if products are the same or similar
+ * Returns a score between 0 and 1 (1 = identical, 0 = completely different)
+ */
+function calculateTitleSimilarity(title1, title2) {
+  if (!title1 || !title2) return 0;
+  
+  const normalize = (str) => str.toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove special chars
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+  
+  const normalized1 = normalize(title1);
+  const normalized2 = normalize(title2);
+  
+  // Exact match
+  if (normalized1 === normalized2) return 1.0;
+  
+  // Check if one contains the other (likely same product with different description)
+  if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
+    return 0.9;
+  }
+  
+  // Extract key words (first 5-6 words, brand/model numbers)
+  const words1 = normalized1.split(/\s+/).slice(0, 6);
+  const words2 = normalized2.split(/\s+/).slice(0, 6);
+  
+  // Count matching words
+  const set1 = new Set(words1);
+  const set2 = new Set(words2);
+  let matches = 0;
+  for (const word of set1) {
+    if (set2.has(word) && word.length > 2) { // Ignore short words
+      matches++;
+    }
+  }
+  
+  // Calculate similarity as ratio of matching words to total unique words
+  const totalUnique = new Set([...words1, ...words2]).size;
+  return matches / totalUnique;
+}
+
+/**
  * Display comparison results in the modal
  */
 function displayComparisonResults(results, currentProduct, modal) {
   const body = modal.querySelector('#supershopper-modal-body');
   if (!body) return;
   
-  // Sort results by price (cheapest first).
-  // Items with null price (Check Price) go to the bottom.
-  const sortedResults = [...results].sort((a, b) => {
-    if (a.price === null && b.price === null) return 0;
-    if (a.price === null) return 1;
-    if (b.price === null) return -1;
-    return a.price - b.price;
-  });
-  const currentPrice = currentProduct.price;
+  // Categorize results into same vs similar products
+  const sameProducts = [];
+  const similarProducts = [];
   
-  // Create comparison table
+  results.forEach(result => {
+    if (result.isCurrentPage) {
+      // Current page always goes in "same" group
+      sameProducts.push(result);
+    } else {
+      // Calculate similarity to current product
+      const similarity = calculateTitleSimilarity(currentProduct.title, result.title);
+      
+      // Threshold: > 0.6 = same product, <= 0.6 = similar product
+      if (similarity > 0.6) {
+        sameProducts.push({ ...result, similarity });
+      } else {
+        similarProducts.push({ ...result, similarity });
+      }
+    }
+  });
+  
+  // Sort similar products by similarity (highest first)
+  similarProducts.sort((a, b) => b.similarity - a.similarity);
+  
+  // Create comparison container
   let html = `
     <div class="supershopper-comparison-container">
       <div class="supershopper-product-header">
         <h3 class="supershopper-product-title">${escapeHtml(currentProduct.title)}</h3>
         ${currentProduct.imageUrl ? `<img src="${escapeUrlForAttribute(currentProduct.imageUrl)}" alt="${escapeHtml(currentProduct.title)}" class="supershopper-product-image" />` : ''}
       </div>
-      <table class="supershopper-comparison-table">
-        <thead>
-          <tr>
-            <th>Retailer</th>
-            <th>Price</th>
-            <th>Difference</th>
-            <th>Availability</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
   `;
   
-  sortedResults.forEach(result => {
-    // Skip price difference calculation if result has no price
-    const hasValidPrice = result.price !== null && result.price > 0;
+  // SECTION 1: Same Product (simpler table, no images needed)
+  if (sameProducts.length > 0) {
+    html += `
+      <div class="supershopper-section">
+        <h4 class="supershopper-section-title">Available at these retailers</h4>
+        <table class="supershopper-comparison-table">
+          <thead>
+            <tr>
+              <th>Retailer</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
     
-    let priceDiff = 0;
-    let priceDiffPercent = 0;
-    let isBetter = false;
-    let isSame = false;
-    
-    if (hasValidPrice) {
-      priceDiff = result.price - currentPrice;
-      priceDiffPercent = ((priceDiff / currentPrice) * 100).toFixed(1);
-      isBetter = priceDiff < 0;
-      isSame = Math.abs(priceDiff) < 0.01;
-    }
-    
-    let indicator = '';
-    let indicatorClass = '';
-    if (result.isCurrentPage) {
-      indicator = '✓';
-      indicatorClass = 'same';
-    } else if (!hasValidPrice) {
-      indicator = '?';
-      indicatorClass = 'same'; // Neutral indicator for unknown prices
-    } else if (isSame) {
-      indicator = '✓';
-      indicatorClass = 'same';
-    } else if (isBetter) {
-      indicator = '↓';
-      indicatorClass = 'better';
-    } else {
-      indicator = '↑';
-      indicatorClass = 'worse';
-    }
-    
-    let priceDiffText = '';
-    if (result.isCurrentPage) {
-      priceDiffText = '<span class="supershopper-current-badge">Current Page</span>';
-    } else if (!hasValidPrice) {
-      priceDiffText = '<span class="supershopper-price-diff same" style="color: #666;">Price not available</span>';
-    } else if (isSame) {
-      priceDiffText = '<span class="supershopper-price-diff same">Same price</span>';
-    } else {
-      const diffFormatted = formatCurrency(Math.abs(priceDiff));
-      const percentText = Math.abs(priceDiffPercent) + '%';
-      const betterWorse = isBetter ? 'cheaper' : 'more expensive';
-      priceDiffText = `<span class="supershopper-price-diff ${indicatorClass}">${isBetter ? '-' : '+'}${diffFormatted} (${percentText} ${betterWorse})</span>`;
-    }
+    sameProducts.forEach(result => {
+      html += `
+        <tr class="${result.isCurrentPage ? 'supershopper-current-row' : ''}">
+          <td>
+            <div class="supershopper-retailer-cell">
+              ${result.isCurrentPage ? '<span class="supershopper-price-indicator same">✓</span>' : ''}
+              <strong>${escapeHtml(result.retailer)}</strong>
+            </div>
+          </td>
+          <td>
+            ${result.isCurrentPage 
+              ? '<span class="supershopper-current-badge">You are here</span>' 
+              : `<a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
+            }
+          </td>
+        </tr>
+      `;
+    });
     
     html += `
-      <tr class="${result.isCurrentPage ? 'supershopper-current-row' : ''}">
-        <td>
-          <div class="supershopper-retailer-cell">
-            <span class="supershopper-price-indicator ${indicatorClass}">${indicator}</span>
-            <strong>${escapeHtml(result.retailer)}</strong>
-          </div>
-        </td>
-        <td class="supershopper-price-cell">
-          ${hasValidPrice ? `<strong>${formatCurrency(result.price)}</strong>` : '<span style="color: #666; font-style: italic;">Can\'t grab price</span>'}
-        </td>
-        <td>${priceDiffText}</td>
-        <td>${escapeHtml(result.availability)}</td>
-        <td>
-          ${result.isCurrentPage 
-            ? '<span class="supershopper-current-badge">You are here</span>' 
-            : `<a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
-          }
-        </td>
-      </tr>
+          </tbody>
+        </table>
+      </div>
     `;
-  });
+  }
   
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
+  // SECTION 2: Similar Products (with images and product names)
+  if (similarProducts.length > 0) {
+    html += `
+      <div class="supershopper-section">
+        <h4 class="supershopper-section-title">Similar products</h4>
+        <div class="supershopper-similar-products">
+    `;
+    
+    similarProducts.forEach(result => {
+      html += `
+        <div class="supershopper-similar-product-card">
+          ${result.imageUrl ? `<img src="${escapeUrlForAttribute(result.imageUrl)}" alt="${escapeHtml(result.title)}" class="supershopper-similar-product-image" />` : '<div class="supershopper-similar-product-image-placeholder">No image</div>'}
+          <div class="supershopper-similar-product-info">
+            <div class="supershopper-similar-product-title">${escapeHtml(result.title)}</div>
+            <div class="supershopper-similar-product-retailer">${escapeHtml(result.retailer)}</div>
+            <a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  html += `</div>`;
   
   body.innerHTML = html;
   
