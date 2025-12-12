@@ -251,8 +251,8 @@ function buildSearchQuery(productInfo) {
     .replace(/\s+/g, ' ') // Multiple spaces to single
     .substring(0, 60); // Shorter limit
   
-  // Append "price" to ensure we get shopping results and not just info pages
-  return `${query} price`; 
+  // Append "buy" to get commerce-focused results (not reviews/info pages)
+  return `${query} buy`; 
 }
 
 /**
@@ -381,6 +381,78 @@ function parseShoppingResults(apiData, currentProduct) {
           return;
         }
 
+        // Filter URLs to ONLY product pages (not reviews, blogs, categories, etc.)
+        const productPagePatterns = [
+          // Amazon patterns
+          /\/dp\/[A-Z0-9]{10}/i,
+          /\/gp\/product\/[A-Z0-9]/i,
+          /\/product\/[A-Z0-9]/i,
+          // Target patterns
+          /\/p\/[A-Z0-9-]+\//i,
+          /\/product\/[0-9]+/i,
+          // Walmart patterns
+          /\/ip\/[^\/]+\/[0-9]+/i,
+          /\/product\/[0-9]+/i,
+          // Generic product patterns
+          /\/product[s]?\/[^\/]+/i,
+          /\/item[s]?\/[^\/]+/i,
+          /\/p\/[^\/]+/i,
+          /\/products\/[^\/]+/i,
+          /\/shop\/[^\/]+\/[^\/]+/i, // shop/category/product
+          /\/buy\/[^\/]+/i,
+          // Best Buy, eBay, etc.
+          /\/site\/[^\/]+\/[^\/]+\/p\.aspx/i,
+          /\/itm\/[0-9]+/i,
+        ];
+        
+        const isProductPage = productPagePatterns.some(pattern => pattern.test(url));
+        
+        // Also check for common NON-product page patterns to exclude
+        const nonProductPatterns = [
+          '/search',
+          '/category',
+          '/categories',
+          '/brand',
+          '/brands',
+          '/review',
+          '/reviews',
+          '/compare',
+          '/guide',
+          '/help',
+          '/blog',
+          '/article',
+          '/news',
+          '/about',
+          '/contact',
+          '/faq',
+          '/sitemap',
+          '/cart',
+          '/checkout',
+          '/account',
+          '/profile',
+          '/wishlist',
+        ];
+        
+        const isNonProductPage = nonProductPatterns.some(pattern => url.includes(pattern));
+        
+        // REJECT if it's clearly not a product page
+        if (isNonProductPage) {
+          console.log(`Item ${index + 1}: Skipped ${url} (non-product page)`);
+          return;
+        }
+        
+        // ACCEPT if it matches product page patterns OR is from known retailers
+        const knownRetailerDomains = ['amazon.com', 'target.com', 'walmart.com', 'bestbuy.com', 
+          'ebay.com', 'costco.com', 'homedepot.com', 'lowes.com', 'kohls.com', 'macys.com',
+          'newegg.com', 'staples.com', 'officedepot.com', 'jbl.com', 'nike.com', 'apple.com',
+          'samsung.com', 'sony.com', 'dell.com'];
+        const isKnownRetailer = knownRetailerDomains.some(domain => hostname.includes(domain));
+        
+        if (!isProductPage && !isKnownRetailer) {
+          console.log(`Item ${index + 1}: Skipped ${url} (not a product page and not known retailer)`);
+          return;
+        }
+
         // Extract retailer from link (full URL) - more reliable than displayLink
         const retailer = extractRetailerName(item.link || item.displayLink || '');
         const retailerKey = retailer.toLowerCase();
@@ -399,11 +471,94 @@ function parseShoppingResults(apiData, currentProduct) {
           return;
         }
         
-        // Extract price from pagemap or snippet
-        let price = null; // Keep as null, not 0
-        let priceEstimated = false;
-        // Pass current price as reference to help pick the best match and validate
-        const priceText = extractPriceFromItem(item, currentProduct.price);
+        // Extract price - PRIORITIZE structured data, text extraction is fallback only
+        let price = null;
+        let priceText = null;
+        
+        // FIRST: Try structured data ONLY (most reliable for accurate prices)
+        if (item.pagemap) {
+          // Try offer/product schemas - check for USD currency
+          if (item.pagemap.offer) {
+            const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
+            for (const offer of offers) {
+              if (offer.price && (offer.priceCurrency === 'USD' || !offer.priceCurrency || offer.priceCurrency === '')) {
+                const priceStr = String(offer.price);
+                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                console.log(`  → Found price in structured data (offer): ${priceText}`);
+                break;
+              }
+            }
+          }
+          
+          if (!priceText && item.pagemap.product) {
+            const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
+            for (const product of products) {
+              if (product.offers && product.offers.price) {
+                const priceCurrency = product.offers.priceCurrency || product.priceCurrency || '';
+                if (priceCurrency === 'USD' || !priceCurrency) {
+                  const priceStr = String(product.offers.price);
+                  priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                  console.log(`  → Found price in structured data (product.offers): ${priceText}`);
+                  break;
+                }
+              }
+              if (!priceText && product.price) {
+                const priceStr = String(product.price);
+                // Validate it's reasonable if we have reference
+                if (currentProduct.price) {
+                  const val = parseFloat(priceStr.replace(/[$,]/g, ''));
+                  if (!isNaN(val) && val > 0 && val / currentProduct.price < 50 && val / currentProduct.price > 0.01) {
+                    priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                    console.log(`  → Found price in structured data (product): ${priceText}`);
+                    break;
+                  }
+                } else {
+                  priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                  console.log(`  → Found price in structured data (product): ${priceText}`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Try Open Graph / Metatags
+          if (!priceText && item.pagemap.metatags) {
+            const tags = Array.isArray(item.pagemap.metatags) ? item.pagemap.metatags : [item.pagemap.metatags];
+            for (const tag of tags) {
+              // Check for USD currency
+              if (tag['og:price:currency'] && tag['og:price:currency'] !== 'USD') continue;
+              if (tag['product:price:currency'] && tag['product:price:currency'] !== 'USD') continue;
+              
+              if (tag['og:price:amount']) {
+                const priceStr = String(tag['og:price:amount']);
+                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                console.log(`  → Found price in structured data (og:price:amount): ${priceText}`);
+                break;
+              }
+              if (tag['product:price:amount']) {
+                const priceStr = String(tag['product:price:amount']);
+                priceText = priceStr.includes('$') ? priceStr : `$${priceStr}`;
+                console.log(`  → Found price in structured data (product:price:amount): ${priceText}`);
+                break;
+              }
+              if (tag['twitter:data1'] && tag['twitter:label1'] === 'Price' && tag['twitter:data1'].includes('$')) {
+                priceText = tag['twitter:data1'];
+                console.log(`  → Found price in structured data (twitter): ${priceText}`);
+                break;
+              }
+            }
+          }
+        }
+        
+        // FALLBACK: Only if structured data fails, try text extraction as last resort
+        if (!priceText) {
+          console.log(`  → No structured data found, trying text extraction...`);
+          priceText = extractPriceFromItemTextOnly(item, currentProduct.price);
+          if (priceText) {
+            console.log(`  → Found price in text (fallback): ${priceText}`);
+          }
+        }
+        
         console.log(`  → Price text found:`, priceText);
         
         if (priceText) {
@@ -648,6 +803,61 @@ function extractPriceFromItem(item, referencePrice = null) {
     return candidates[0];
   }
 
+  // Fallback: Try decoding HTML snippet if simple regex failed
+  if (item.htmlSnippet) {
+    const decoded = item.htmlSnippet
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/&#36;/g, '$'); // Decode $ entity
+      
+    const matchesHtml = [...decoded.matchAll(priceRegex)];
+    if (matchesHtml.length > 0) {
+      return matchesHtml[0][0].trim();
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract price from text only (fallback when structured data unavailable)
+ * This is less reliable than structured data but better than nothing
+ */
+function extractPriceFromItemTextOnly(item, referencePrice = null) {
+  // ONLY use this as fallback - structured data is preferred
+  const textToSearch = (item.title + " " + (item.snippet || "") + " " + (item.htmlSnippet || "")).replace(/\s+/g, " ");
+  
+  // STRICT regex: ONLY match prices with $ symbol (USD)
+  const priceRegex = /\$\s*([0-9]{1,3}(?:[,][0-9]{3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)(?!\s*(?:off|discount|saved|cash back|shipping|tax))/gi;
+  
+  const matches = [...textToSearch.matchAll(priceRegex)];
+  
+  if (matches.length > 0) {
+    const candidates = matches.map(m => m[0].trim());
+    
+    if (referencePrice && candidates.length > 1) {
+      let bestCandidate = candidates[0];
+      let minDiff = Number.MAX_VALUE;
+      
+      for (const candidate of candidates) {
+        const val = parsePriceTextUSDOnly(candidate);
+        if (val !== null && val > 0) {
+          // Reject prices that are way off (currency confusion)
+          const ratio = val / referencePrice;
+          if (ratio > 50 || ratio < 0.01) continue;
+          
+          const diff = Math.abs(val - referencePrice);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestCandidate = candidate;
+          }
+        }
+      }
+      return bestCandidate;
+    }
+    
+    return candidates[0];
+  }
+  
   // Fallback: Try decoding HTML snippet if simple regex failed
   if (item.htmlSnippet) {
     const decoded = item.htmlSnippet
