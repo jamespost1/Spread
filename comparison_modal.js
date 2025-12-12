@@ -442,7 +442,7 @@ function parseShoppingResults(apiData, currentProduct) {
         }
         
         // Filter out app store links (iOS App Store, Google Play Store, etc.)
-        if (url.includes('apps.apple.com') || url.includes('play.google.com') || url.includes('app-store') || url.includes('/app/') && !url.includes('/product')) {
+        if (url.includes('apps.apple.com') || url.includes('play.google.com') || url.includes('app-store') || (url.includes('/app/') && !url.includes('/product'))) {
           console.log(`Item ${index + 1}: Skipped ${url} (app store link)`);
           return;
         }
