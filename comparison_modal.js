@@ -252,7 +252,22 @@ function buildSearchQuery(productInfo) {
     .substring(0, 60); // Shorter limit
   
   // Append "buy" to get commerce-focused results (not reviews/info pages)
-  return `${query} buy`; 
+  let finalQuery = `${query} buy`;
+  
+  // Exclude current retailer from search to get more diverse results
+  // This prevents Amazon results when searching from Amazon, etc.
+  if (productInfo.retailer) {
+    const retailerLower = productInfo.retailer.toLowerCase();
+    if (retailerLower === 'amazon') {
+      finalQuery = `${finalQuery} -site:amazon.com`;
+    } else if (retailerLower === 'walmart') {
+      finalQuery = `${finalQuery} -site:walmart.com`;
+    } else if (retailerLower === 'target') {
+      finalQuery = `${finalQuery} -site:target.com`;
+    }
+  }
+  
+  return finalQuery; 
 }
 
 /**
@@ -266,7 +281,7 @@ function buildShoppingAPIUrl(apiKey, searchEngineId, query) {
     cx: searchEngineId,
     q: query,
     // tbm: 'shop', // REMOVED: Use regular web search for better metadata/snippets
-    num: '10', // Get up to 10 results
+    num: '20', // Increased from 10 to 20 to get more retailer results
     safe: 'active'
   });
   
@@ -387,8 +402,9 @@ function parseShoppingResults(apiData, currentProduct) {
           /\/dp\/[A-Z0-9]{10}/i,
           /\/gp\/product\/[A-Z0-9]/i,
           /\/product\/[A-Z0-9]/i,
-          // Target patterns
-          /\/p\/[A-Z0-9-]+\//i,
+          // Target patterns - more flexible to handle /p/product-name/-/A-12345678 format
+          /\/p\/[^\/]+/i, // Match /p/ followed by anything (handles /p/product-name/-/A-123 or /p/-/A-123)
+          /\/p\/[A-Z0-9-]+\//i, // Also handle /p/ALPHA-NUM/
           /\/product\/[0-9]+/i,
           // Walmart patterns
           /\/ip\/[^\/]+\/[0-9]+/i,
@@ -448,9 +464,11 @@ function parseShoppingResults(apiData, currentProduct) {
         }
         
         // Filter out root/homepage URLs (these aren't product pages)
-        // Check if URL is just domain or domain with only trailing slash
+        // But be lenient - Target URLs like target.com/p/product-name/-/A-123 should pass
         const urlPath = url.match(/https?:\/\/[^\/]+\/(.*)/)?.[1] || '';
-        if (!urlPath || urlPath.trim() === '' || urlPath === '/') {
+        // Only reject if it's truly just the domain with no path or just a slash
+        if ((!urlPath || urlPath.trim() === '' || urlPath === '/') && !hostname.includes('target.com')) {
+          // Allow Target even if path looks short (Target URLs can be complex)
           console.log(`Item ${index + 1}: Skipped ${url} (homepage/root URL)`);
           return;
         }
@@ -476,6 +494,8 @@ function parseShoppingResults(apiData, currentProduct) {
             console.log(`Item ${index + 1}: Skipped ${url} (brand site without product page pattern)`);
             return;
           }
+          // For known retailers like Target, be more lenient - accept if it's from a known retailer domain
+          // even if pattern doesn't match exactly (Target URLs can vary)
           if (!isKnownRetailer) {
             console.log(`Item ${index + 1}: Skipped ${url} (not a product page and not known retailer)`);
             return;
