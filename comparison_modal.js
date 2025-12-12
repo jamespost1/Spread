@@ -264,7 +264,7 @@ function buildShoppingAPIUrl(apiKey, searchEngineId, query) {
     key: apiKey,
     cx: searchEngineId,
     q: query,
-    tbm: 'shop', // Search Google Shopping
+    // tbm: 'shop', // REMOVED: Use regular web search for better metadata/snippets
     num: '10', // Get up to 10 results
     safe: 'active'
   });
@@ -335,7 +335,8 @@ function parseShoppingResults(apiData, currentProduct) {
         // Extract price from pagemap or snippet
         let price = null; // Keep as null, not 0
         let priceEstimated = false;
-        const priceText = extractPriceFromItem(item);
+        // Pass current price as reference to help pick the best match
+        const priceText = extractPriceFromItem(item, currentProduct.price);
         console.log(`  → Price text found:`, priceText);
         
         if (priceText) {
@@ -454,61 +455,78 @@ function extractRetailerName(url) {
 /**
  * Extract price from shopping result item
  */
-function extractPriceFromItem(item) {
-  // Try multiple locations for price
-  if (item.pagemap && item.pagemap.offer) {
-    const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
-    for (const offer of offers) {
-      if (offer.price) {
-        return offer.price;
+function extractPriceFromItem(item, referencePrice = null) {
+  // 1. Try Structured Data (Rich Snippets) - Most Reliable
+  if (item.pagemap) {
+    // Try offer/product schemas
+    if (item.pagemap.offer) {
+      const offers = Array.isArray(item.pagemap.offer) ? item.pagemap.offer : [item.pagemap.offer];
+      for (const offer of offers) {
+        if (offer.price) return offer.price;
+      }
+    }
+    if (item.pagemap.product) {
+      const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
+      for (const product of products) {
+        if (product.offers && product.offers.price) return product.offers.price;
+        if (product.price) return product.price;
+      }
+    }
+    
+    // NEW: Try Open Graph / Metatags (Common in many retailers)
+    if (item.pagemap.metatags) {
+      const tags = Array.isArray(item.pagemap.metatags) ? item.pagemap.metatags : [item.pagemap.metatags];
+      for (const tag of tags) {
+        if (tag['og:price:amount']) return tag['og:price:amount'];
+        if (tag['product:price:amount']) return tag['product:price:amount'];
+        if (tag['twitter:data1'] && tag['twitter:label1'] === 'Price') return tag['twitter:data1'];
       }
     }
   }
+
+  // 2. Text Extraction Strategy
+  // Combine title and snippet for search
+  const textToSearch = (item.title + " " + (item.snippet || "")).replace(/\s+/g, " ");
   
-  // Try product schema
-  if (item.pagemap && item.pagemap.product) {
-    const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
-    for (const product of products) {
-      if (product.offers && product.offers.price) {
-        return product.offers.price;
+  // Regex to find prices: $X.XX or $XX
+  // Capture group 1: The amount
+  // Negative lookahead (?!) to avoid "off", "discount", "saved" immediately after
+  const priceRegex = /\$([0-9,]+(?:\.[0-9]{2})?)(?!\s*(?:off|discount|saved|cash back))/gi;
+  
+  const matches = [...textToSearch.matchAll(priceRegex)];
+  
+  if (matches.length > 0) {
+    const candidates = matches.map(m => m[0]); // Get the full strings "$10.00"
+    
+    // If we have a reference price, pick the candidate closest to it
+    if (referencePrice && candidates.length > 1) {
+      let bestCandidate = candidates[0];
+      let minDiff = Number.MAX_VALUE;
+      
+      for (const candidate of candidates) {
+        const val = parsePriceText(candidate);
+        if (val !== null) {
+          const diff = Math.abs(val - referencePrice);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestCandidate = candidate;
+          }
+        }
       }
-      if (product.price) {
-        return product.price;
-      }
+      return bestCandidate;
     }
+    
+    return candidates[0];
   }
-  
-  // Try plain snippet first (non-HTML, more reliable)
-  if (item.snippet) {
-    // Match prices like $99.99, $1,234.56, or $99
-    const priceMatch = item.snippet.match(/\$[\d,]+(?:\.\d{2})?/);
-    if (priceMatch) {
-      return priceMatch[0];
-    }
-  }
-  
-  // Try htmlSnippet for price patterns (decode HTML entities first)
+
+  // Fallback: Try decoding HTML snippet if simple regex failed
   if (item.htmlSnippet) {
-    // Decode common HTML entities
     const decoded = item.htmlSnippet
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, ' ');
-    // Match prices like $99.99 or $1,234.56
-    const priceMatch = decoded.match(/\$[\d,]+(?:\.\d{2})?/);
-    if (priceMatch) {
-      return priceMatch[0];
-    }
-  }
-  
-  // Try title for price
-  if (item.title) {
-    const priceMatch = item.title.match(/\$[\d,]+(?:\.\d{2})?/);
-    if (priceMatch) {
-      return priceMatch[0];
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+      
+    const matchesHtml = [...decoded.matchAll(priceRegex)];
+    if (matchesHtml.length > 0) {
+      return matchesHtml[0][0];
     }
   }
   
