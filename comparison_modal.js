@@ -2,7 +2,7 @@
 // Price comparison modal UI and logic
 
 /**
- * Create and inject the Compare Prices button next to the product price
+ * Create and inject the View Other Retailers button next to the product price
  */
 function injectCompareButton(productInfo) {
   if (!productInfo || !productInfo.priceElement) return;
@@ -14,7 +14,7 @@ function injectCompareButton(productInfo) {
   try {
     const button = document.createElement('button');
     button.className = 'supershopper-compare-btn';
-    button.textContent = 'Compare Prices';
+    button.textContent = 'View other retailers';
     button.setAttribute('data-supershopper-injected', '1');
     
     // Add click handler
