@@ -254,10 +254,16 @@ function buildSearchQuery(productInfo) {
   // Append "buy" to get commerce-focused results (not reviews/info pages)
   let finalQuery = `${query} buy`;
   
+  // Prioritize Target in search (if not already on Target) to ensure it appears in results
+  const retailerLower = productInfo.retailer?.toLowerCase() || '';
+  if (retailerLower !== 'target') {
+    // Add Target-specific search to boost it in results
+    finalQuery = `(${finalQuery}) OR (site:target.com ${query})`;
+  }
+  
   // Exclude current retailer from search to get more diverse results
   // This prevents Amazon results when searching from Amazon, etc.
   if (productInfo.retailer) {
-    const retailerLower = productInfo.retailer.toLowerCase();
     if (retailerLower === 'amazon') {
       finalQuery = `${finalQuery} -site:amazon.com`;
     } else if (retailerLower === 'walmart') {
@@ -281,7 +287,7 @@ function buildShoppingAPIUrl(apiKey, searchEngineId, query) {
     cx: searchEngineId,
     q: query,
     // tbm: 'shop', // REMOVED: Use regular web search for better metadata/snippets
-    num: '20', // Increased from 10 to 20 to get more retailer results
+    num: '10', // Google Custom Search API max is 10 results per request
     safe: 'active'
   });
   
