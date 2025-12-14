@@ -15,6 +15,12 @@ function extractProductInfo() {
     return extractTargetProduct();
   } else if (hostname.includes('walmart.')) {
     return extractWalmartProduct();
+  } else if (hostname.includes('bestbuy.') || hostname.includes('best-buy.')) {
+    return extractBestBuyProduct();
+  } else if (hostname.includes('ebay.')) {
+    return extractEbayProduct();
+  } else if (hostname.includes('costco.')) {
+    return extractCostcoProduct();
   }
   
   return null;
@@ -429,6 +435,353 @@ function extractWalmartProduct() {
     }
   } catch (error) {
     console.warn('Error extracting Walmart product:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract product information from Best Buy
+ */
+function extractBestBuyProduct() {
+  try {
+    // Product title
+    const titleSelectors = [
+      'h1[class*="heading"]',
+      '.sku-title h1',
+      'h1.sr-only + h1',
+      'h1'
+    ];
+    let title = null;
+    for (const selector of titleSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        title = el.textContent.trim();
+        if (title && title.length > 0 && !title.includes('Best Buy')) break;
+      }
+    }
+    
+    // Price
+    const priceSelectors = [
+      '.priceView-customer-price span[aria-hidden="true"]',
+      '.priceView-price .priceView-customer-price',
+      '[class*="pricing-price"]',
+      '[data-testid="customer-price"]',
+      '.pricing-price__value'
+    ];
+    let price = null;
+    let priceElement = null;
+    for (const selector of priceSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const priceText = el.textContent || el.innerText || '';
+        price = parsePriceText(priceText);
+        if (price && price > 0) {
+          priceElement = el;
+          break;
+        }
+      }
+    }
+    
+    // Product image
+    const imageSelectors = [
+      '.product-image img',
+      '[data-testid="product-image"] img',
+      '.gallery-image img',
+      'img.product-image'
+    ];
+    let imageUrl = null;
+    for (const selector of imageSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        imageUrl = el.src || el.getAttribute('data-src') || el.getAttribute('srcset')?.split(' ')[0];
+        if (imageUrl && imageUrl.startsWith('http')) {
+          break;
+        }
+      }
+    }
+    
+    // Brand
+    let brand = null;
+    const brandSelectors = [
+      '[data-testid="product-brand"]',
+      '.product-brand',
+      '[itemprop="brand"]',
+      'span[class*="brand"]'
+    ];
+    for (const selector of brandSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        brand = el.textContent.trim();
+        if (brand) break;
+      }
+    }
+    
+    // SKU - from URL or meta tags
+    let sku = null;
+    const urlMatch = window.location.href.match(/skuId=(\d+)/);
+    if (urlMatch) {
+      sku = urlMatch[1];
+    }
+    
+    // Model number / UPC
+    let model = null;
+    const specs = document.querySelectorAll('.product-data-specification, .specifications-list');
+    for (const spec of specs) {
+      const rows = spec.querySelectorAll('tr, .spec-item');
+      for (const row of rows) {
+        const label = row.querySelector('th, .spec-label, dt')?.textContent?.trim()?.toLowerCase();
+        const value = row.querySelector('td, .spec-value, dd')?.textContent?.trim();
+        if (label && (label.includes('model') || label.includes('upc') || label.includes('sku')) && value) {
+          if (label.includes('model')) model = value;
+          if (!sku && (label.includes('sku') || label.includes('upc'))) sku = value;
+          break;
+        }
+      }
+    }
+    
+    if (title && price) {
+      return {
+        retailer: 'Best Buy',
+        title: title,
+        price: price,
+        currency: 'USD',
+        imageUrl: imageUrl,
+        brand: brand,
+        sku: sku || model,
+        model: model,
+        url: window.location.href,
+        priceElement: priceElement
+      };
+    }
+  } catch (error) {
+    console.warn('Error extracting Best Buy product:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract product information from eBay
+ */
+function extractEbayProduct() {
+  try {
+    // Product title
+    const titleSelectors = [
+      'h1[id*="ebay-item-title"]',
+      'h1.x-item-title-label',
+      '.x-item-title-label',
+      'h1.it-ttl'
+    ];
+    let title = null;
+    for (const selector of titleSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        title = el.textContent.trim();
+        if (title && title.length > 0) break;
+      }
+    }
+    
+    // Price
+    const priceSelectors = [
+      '.notranslate[id*="prcIsum"]',
+      '#prcIsum',
+      '.u-flL.condText',
+      '.notranslate[itemprop="price"]'
+    ];
+    let price = null;
+    let priceElement = null;
+    for (const selector of priceSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const priceText = el.textContent || el.getAttribute('content') || '';
+        price = parsePriceText(priceText);
+        if (price && price > 0) {
+          priceElement = el;
+          break;
+        }
+      }
+    }
+    
+    // Product image
+    const imageSelectors = [
+      '#icImg',
+      '.img.img640',
+      '[id*="icImg"]',
+      'img[itemprop="image"]'
+    ];
+    let imageUrl = null;
+    for (const selector of imageSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        imageUrl = el.src || el.getAttribute('data-src') || el.getAttribute('srcset')?.split(' ')[0];
+        if (imageUrl && imageUrl.startsWith('http')) {
+          break;
+        }
+      }
+    }
+    
+    // Brand (often in title or item specifics)
+    let brand = null;
+    const brandSelectors = [
+      '[data-testid="ux-labels-values__values"]',
+      '.u-flL.condText',
+      'div[class*="itemAttr"]'
+    ];
+    for (const selector of brandSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const text = el.textContent.toLowerCase();
+        if (text.includes('brand')) {
+          brand = el.textContent.replace(/brand:/i, '').trim();
+          if (brand) break;
+        }
+      }
+    }
+    
+    // Item ID - from URL
+    let itemId = null;
+    const urlMatch = window.location.href.match(/\/itm\/(\d+)/);
+    if (urlMatch) {
+      itemId = urlMatch[1];
+    }
+    
+    if (title && price) {
+      return {
+        retailer: 'eBay',
+        title: title,
+        price: price,
+        currency: 'USD',
+        imageUrl: imageUrl,
+        brand: brand,
+        sku: itemId,
+        itemId: itemId,
+        url: window.location.href,
+        priceElement: priceElement
+      };
+    }
+  } catch (error) {
+    console.warn('Error extracting eBay product:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract product information from Costco
+ */
+function extractCostcoProduct() {
+  try {
+    // Product title
+    const titleSelectors = [
+      'h1[automation-id="productOutputTitle"]',
+      '.product-title h1',
+      'h1.product-title',
+      'h1'
+    ];
+    let title = null;
+    for (const selector of titleSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        title = el.textContent.trim();
+        if (title && title.length > 0 && !title.includes('Costco')) break;
+      }
+    }
+    
+    // Price
+    const priceSelectors = [
+      '[automation-id="productPriceOutput"]',
+      '.product-price',
+      '.price-value',
+      '[itemprop="price"]'
+    ];
+    let price = null;
+    let priceElement = null;
+    for (const selector of priceSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const priceText = el.textContent || el.getAttribute('content') || '';
+        price = parsePriceText(priceText);
+        if (price && price > 0) {
+          priceElement = el;
+          break;
+        }
+      }
+    }
+    
+    // Product image
+    const imageSelectors = [
+      '[automation-id="productImageOutput"] img',
+      '.product-image img',
+      '.img-container img',
+      'img.product-image'
+    ];
+    let imageUrl = null;
+    for (const selector of imageSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        imageUrl = el.src || el.getAttribute('data-src') || el.getAttribute('srcset')?.split(' ')[0];
+        if (imageUrl && imageUrl.startsWith('http')) {
+          break;
+        }
+      }
+    }
+    
+    // Brand
+    let brand = null;
+    const brandSelectors = [
+      '[automation-id="productBrand"]',
+      '.product-brand',
+      '[itemprop="brand"]'
+    ];
+    for (const selector of brandSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        brand = el.textContent.trim();
+        if (brand) break;
+      }
+    }
+    
+    // Item number - from URL or product details
+    let itemNumber = null;
+    const urlMatch = window.location.href.match(/\.product\.(\d+)\.html/);
+    if (urlMatch) {
+      itemNumber = urlMatch[1];
+    }
+    
+    // Model number / UPC
+    let model = null;
+    const details = document.querySelectorAll('.product-details, .specifications');
+    for (const detail of details) {
+      const rows = detail.querySelectorAll('tr, .spec-row');
+      for (const row of rows) {
+        const label = row.querySelector('th, .label, dt')?.textContent?.trim()?.toLowerCase();
+        const value = row.querySelector('td, .value, dd')?.textContent?.trim();
+        if (label && (label.includes('model') || label.includes('item') || label.includes('upc')) && value) {
+          if (label.includes('model')) model = value;
+          if (!itemNumber && label.includes('item')) itemNumber = value;
+          break;
+        }
+      }
+    }
+    
+    if (title && price) {
+      return {
+        retailer: 'Costco',
+        title: title,
+        price: price,
+        currency: 'USD',
+        imageUrl: imageUrl,
+        brand: brand,
+        sku: itemNumber || model,
+        itemNumber: itemNumber,
+        model: model,
+        url: window.location.href,
+        priceElement: priceElement
+      };
+    }
+  } catch (error) {
+    console.warn('Error extracting Costco product:', error);
   }
   
   return null;
