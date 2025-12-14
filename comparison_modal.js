@@ -481,6 +481,8 @@ function parseShoppingResults(apiData, currentProduct) {
           // Walmart patterns
           /\/ip\/[^\/]+\/[0-9]+/i,
           /\/product\/[0-9]+/i,
+          // Walgreens patterns
+          /\/store\/.*\/id=/i,
           // Generic product patterns
           /\/product[s]?\/[^\/]+/i,
           /\/item[s]?\/[^\/]+/i,
@@ -549,7 +551,7 @@ function parseShoppingResults(apiData, currentProduct) {
         // For known retailers (especially brand sites), we still require product page patterns
         const knownRetailerDomains = ['amazon.com', 'target.com', 'walmart.com', 'bestbuy.com', 
           'ebay.com', 'costco.com', 'homedepot.com', 'lowes.com', 'kohls.com', 'macys.com',
-          'newegg.com', 'staples.com', 'officedepot.com'];
+          'newegg.com', 'staples.com', 'officedepot.com', 'kroger.com', 'walgreens.com', 'frysfood.com'];
         const isKnownRetailer = knownRetailerDomains.some(domain => hostname.includes(domain));
         
         // Brand websites need to have product page patterns too
@@ -641,6 +643,8 @@ const RETAILER_MAP = {
   'best-buy': 'Best Buy',
   'ebay': 'eBay',
   'kroger': 'Kroger',
+  'walgreens': 'Walgreens',
+  'frysfood': "Fry's Food",
   'homedepot': 'Home Depot',
   'home-depot': 'Home Depot',
   'lowes': "Lowe's",
