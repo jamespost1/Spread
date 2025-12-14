@@ -464,10 +464,16 @@ function extractBestBuyProduct() {
     // Price
     const priceSelectors = [
       '.priceView-customer-price span[aria-hidden="true"]',
+      '.priceView-customer-price',
       '.priceView-price .priceView-customer-price',
       '[class*="pricing-price"]',
       '[data-testid="customer-price"]',
-      '.pricing-price__value'
+      '.pricing-price__value',
+      '.priceView-customer-price__price',
+      '.customer-price',
+      'span[class*="priceView"]',
+      '.pricing-price-display',
+      '[itemprop="price"]'
     ];
     let price = null;
     let priceElement = null;
@@ -586,8 +592,14 @@ function extractEbayProduct() {
     const priceSelectors = [
       '.notranslate[id*="prcIsum"]',
       '#prcIsum',
+      '#prcIsum_bidPrice',
+      '.notranslate[itemprop="price"]',
+      '[itemprop="price"]',
       '.u-flL.condText',
-      '.notranslate[itemprop="price"]'
+      '.notranslate.notranslate',
+      '[data-testid="x-price-primary"]',
+      '.x-price-primary',
+      '.x-price-approx__value'
     ];
     let price = null;
     let priceElement = null;
@@ -693,7 +705,13 @@ function extractCostcoProduct() {
       '[automation-id="productPriceOutput"]',
       '.product-price',
       '.price-value',
-      '[itemprop="price"]'
+      '.product-price .value',
+      '[itemprop="price"]',
+      '[itemprop="price"] [content]',
+      '.price-display',
+      '[class*="price-output"]',
+      '[class*="product-price"]',
+      '.price'
     ];
     let price = null;
     let priceElement = null;
