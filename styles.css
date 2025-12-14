@@ -465,6 +465,75 @@
   text-align: center;
 }
 
+/* Cache Indicator */
+.supershopper-cache-indicator {
+  padding: 8px 12px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1976d2;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* Filter and Sort Controls */
+.supershopper-controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f5f9ff;
+  border-radius: 8px;
+  border: 1px solid #e3f2fd;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.supershopper-filter-group,
+.supershopper-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supershopper-filter-group label,
+.supershopper-sort-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.supershopper-filter-select,
+.supershopper-sort-select {
+  padding: 6px 12px;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 180px;
+  transition: border-color 0.2s ease;
+}
+
+.supershopper-filter-select:hover,
+.supershopper-sort-select:hover {
+  border-color: #64b5f6;
+}
+
+.supershopper-filter-select:focus,
+.supershopper-sort-select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+}
+
+.supershopper-results-wrapper {
+  /* Container for results sections */
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .supershopper-modal-content {
