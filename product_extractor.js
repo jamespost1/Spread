@@ -591,6 +591,7 @@ function extractEbayProduct() {
     
     // Price
     const priceSelectors = [
+      '.ux-textspans',
       '.notranslate[id*="prcIsum"]',
       '#prcIsum',
       '#prcIsum_bidPrice',
