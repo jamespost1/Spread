@@ -640,6 +640,7 @@ const RETAILER_MAP = {
   'bestbuy': 'Best Buy',
   'best-buy': 'Best Buy',
   'ebay': 'eBay',
+  'kroger': 'Kroger',
   'homedepot': 'Home Depot',
   'home-depot': 'Home Depot',
   'lowes': "Lowe's",
@@ -1256,9 +1257,9 @@ function displayComparisonResults(results, currentProduct, modal, isCached = fal
       // Calculate similarity to current product (pass currentProduct for brand matching)
       const similarity = calculateTitleSimilarity(currentProduct.title, result.title, currentProduct);
       
-      // Lower threshold to 0.70 to be more inclusive (same products often have slightly different titles)
+      // Lower threshold to 0.65 to catch more same products (they often have slightly different titles)
       // Model number matches will push this over 0.95 anyway
-      if (similarity > 0.70) {  // CHANGED: from 0.75 to 0.70
+      if (similarity > 0.65) {  // CHANGED: from 0.70 to 0.65
         sameProducts.push({ ...result, similarity });
       } else {
         similarProducts.push({ ...result, similarity });
