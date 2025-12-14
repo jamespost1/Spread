@@ -702,7 +702,7 @@ function extractCostcoProduct() {
       }
     }
     
-    // Price
+    // Price - Costco splits price into whole number and cents
     const priceSelectors = [
       '[automation-id="productPriceOutput"]',
       '.product-price',
@@ -717,6 +717,8 @@ function extractCostcoProduct() {
     ];
     let price = null;
     let priceElement = null;
+    
+    // Try standard selectors first
     for (const selector of priceSelectors) {
       const el = document.querySelector(selector);
       if (el) {
@@ -725,6 +727,23 @@ function extractCostcoProduct() {
         if (price && price > 0) {
           priceElement = el;
           break;
+        }
+      }
+    }
+    
+    // If standard extraction failed, try Costco's split price format
+    if (!price) {
+      const wholeNumberEl = document.querySelector('.MuiTypography-root.MuiTypography-bodyCopy.mui-p0pj4e');
+      const centsEl = document.querySelector('.MuiTypography-root.MuiTypography-bodyCopy.mui-1mobqzt');
+      
+      if (wholeNumberEl && centsEl) {
+        const wholeNumber = wholeNumberEl.textContent.trim();
+        const cents = centsEl.textContent.trim();
+        const combinedPriceText = `$${wholeNumber}.${cents}`;
+        price = parsePriceText(combinedPriceText);
+        if (price && price > 0) {
+          // Use the whole number element as the price element for button placement
+          priceElement = wholeNumberEl.parentElement || wholeNumberEl;
         }
       }
     }
