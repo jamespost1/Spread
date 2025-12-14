@@ -1225,6 +1225,11 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
   const bothHaveBrand = hasBrand1 && hasBrand2;
   const brandMatchScore = bothHaveBrand ? 0.8 : 0.3;
   
+  // If brand + count both match, treat as same product (similar to model number match)
+  if (bothHaveBrand && matchingCounts) {
+    return 0.90; // Very strong signal - brand + count/size match = same product
+  }
+  
   // C. Token-Based Jaccard Similarity (20% weight)
   const commonWords = new Set(['the', 'and', 'or', 'for', 'with', 'pack', 'pairs', 'pair', 'set', 'bundle', 'of', 'a', 'an', 'in', 'on', 'at']);
   const extractTokens = (str) => {
