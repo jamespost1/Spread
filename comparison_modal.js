@@ -128,10 +128,79 @@ function showLoadingState(modal) {
 }
 
 /**
+ * Generate cache key from product info
+ */
+function getCacheKey(productInfo) {
+  // Use URL + retailer as unique identifier
+  const url = productInfo.url || window.location.href;
+  const retailer = productInfo.retailer || 'unknown';
+  return `search_cache_${retailer}_${encodeURIComponent(url)}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
+ * Load cached results if available and fresh
+ */
+function loadCachedResults(cacheKey) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([cacheKey], (items) => {
+      const cached = items[cacheKey];
+      if (!cached) {
+        resolve(null);
+        return;
+      }
+      
+      // Check if cache is expired (24 hours)
+      const now = Date.now();
+      if (cached.expiresAt && now > cached.expiresAt) {
+        // Cache expired, remove it
+        chrome.storage.local.remove([cacheKey]);
+        resolve(null);
+        return;
+      }
+      
+      // Cache is valid
+      console.log('Cache hit for:', cacheKey);
+      resolve({
+        results: cached.results,
+        productInfo: cached.productInfo,
+        timestamp: cached.timestamp,
+        isCached: true
+      });
+    });
+  });
+}
+
+/**
+ * Save results to cache
+ */
+function saveCachedResults(cacheKey, results, productInfo) {
+  const cacheData = {
+    results: results,
+    productInfo: productInfo,
+    timestamp: Date.now(),
+    expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+  };
+  
+  chrome.storage.local.set({ [cacheKey]: cacheData }, () => {
+    console.log('Cached results for:', cacheKey);
+  });
+}
+
+/**
  * Fetch price comparisons from Google Shopping via Custom Search API
  */
 async function fetchPriceComparisons(productInfo, modal) {
   try {
+    // Check cache first
+    const cacheKey = getCacheKey(productInfo);
+    const cached = await loadCachedResults(cacheKey);
+    
+    if (cached) {
+      // Use cached results
+      displayComparisonResults(cached.results, cached.productInfo, modal, true);
+      return;
+    }
+    
     // Get API configuration from storage
     const config = await getAPIConfig();
     
@@ -174,6 +243,9 @@ async function fetchPriceComparisons(productInfo, modal) {
       displayComparisonResults(fallbackResults, productInfo, modal);
       return;
     }
+    
+    // Cache the results
+    saveCachedResults(cacheKey, results, productInfo);
     
     displayComparisonResults(results, productInfo, modal);
     
@@ -556,7 +628,93 @@ function parseShoppingResults(apiData, currentProduct) {
 }
 
 /**
- * Extract retailer name from URL
+ * Comprehensive retailer mapping for 20+ major retailers
+ * Maps hostname patterns to display names
+ */
+const RETAILER_MAP = {
+  // Major General Retailers
+  'amazon': 'Amazon',
+  'target': 'Target',
+  'walmart': 'Walmart',
+  'costco': 'Costco',
+  'bestbuy': 'Best Buy',
+  'best-buy': 'Best Buy',
+  'ebay': 'eBay',
+  'homedepot': 'Home Depot',
+  'home-depot': 'Home Depot',
+  'lowes': "Lowe's",
+  'kohls': "Kohl's",
+  'macys': "Macy's",
+  'jcpenney': "JCPenney",
+  'jc-penney': "JCPenney",
+  'sears': 'Sears',
+  'overstock': 'Overstock',
+  'wayfair': 'Wayfair',
+  'zappos': 'Zappos',
+  
+  // Electronics & Tech
+  'newegg': 'Newegg',
+  'bhphotovideo': 'B&H Photo',
+  'bhphoto': 'B&H Photo',
+  'microcenter': 'Micro Center',
+  'micro-center': 'Micro Center',
+  'frys': "Fry's Electronics",
+  'apple': 'Apple',
+  'microsoft': 'Microsoft Store',
+  
+  // Office Supplies
+  'staples': 'Staples',
+  'officedepot': 'Office Depot',
+  'office-depot': 'Office Depot',
+  'officemax': 'OfficeMax',
+  
+  // Sports & Outdoor
+  'rei': 'REI',
+  'dickssportinggoods': "Dick's Sporting Goods",
+  'dicks': "Dick's Sporting Goods",
+  'academy': "Academy Sports",
+  
+  // Pets
+  'chewy': 'Chewy',
+  'petco': 'Petco',
+  'petsmart': 'PetSmart',
+  'pet-smart': 'PetSmart',
+  
+  // Home & Furniture
+  'bedbathandbeyond': "Bed Bath & Beyond",
+  'bed-bath-and-beyond': "Bed Bath & Beyond",
+  'crateandbarrel': 'Crate & Barrel',
+  'crate-and-barrel': 'Crate & Barrel',
+  'potterybarn': 'Pottery Barn',
+  'pottery-barn': 'Pottery Barn',
+  'westelm': 'West Elm',
+  'west-elm': 'West Elm',
+  'ikea': 'IKEA',
+  
+  // Specialty
+  'gamestop': 'GameStop',
+  'game-stop': 'GameStop',
+  'ulta': 'Ulta Beauty',
+  'sephora': 'Sephora',
+  'nordstrom': 'Nordstrom',
+  'nordstromrack': "Nordstrom Rack",
+  'nordstrom-rack': "Nordstrom Rack",
+  
+  // Brand Websites
+  'nike': 'Nike',
+  'adidas': 'Adidas',
+  'sony': 'Sony',
+  'samsung': 'Samsung',
+  'dell': 'Dell',
+  'hp': 'HP',
+  'lenovo': 'Lenovo',
+  'jbl': 'JBL',
+  'lg': 'LG',
+  'tcl': 'TCL',
+};
+
+/**
+ * Extract retailer name from URL using comprehensive mapping
  */
 function extractRetailerName(url) {
   try {
@@ -572,24 +730,50 @@ function extractRetailerName(url) {
       hostname = url.toLowerCase().replace(/^www\./, '');
     }
     
-    // Common retailer mappings (check for exact matches first)
-    if (hostname.includes('amazon.')) return 'Amazon';
-    if (hostname.includes('target.')) return 'Target';
-    if (hostname.includes('walmart.')) return 'Walmart';
-    if (hostname.includes('bestbuy.') || hostname.includes('best-buy.')) return 'Best Buy';
-    if (hostname.includes('ebay.')) return 'eBay';
-    if (hostname.includes('costco.')) return 'Costco';
-    if (hostname.includes('homedepot.') || hostname.includes('home-depot.')) return 'Home Depot';
-    if (hostname.includes('lowes.')) return "Lowe's";
-    if (hostname.includes('kohls.') || hostname.includes('kohls')) return "Kohl's";
+    // Remove www. prefix if present for matching
+    hostname = hostname.replace(/^www\./, '');
+    
+    // Check against retailer map by iterating through known patterns
+    for (const [pattern, displayName] of Object.entries(RETAILER_MAP)) {
+      if (hostname.includes(pattern)) {
+        return displayName;
+      }
+    }
     
     // Extract domain name as fallback (e.g., "www.kohls.com" -> "Kohl's")
     const parts = hostname.split('.');
     if (parts.length >= 2) {
       const domain = parts[parts.length - 2]; // e.g., "kohls" from "www.kohls.com"
+      
+      // Check if domain matches any known pattern
+      for (const [pattern, displayName] of Object.entries(RETAILER_MAP)) {
+        if (domain.includes(pattern)) {
+          return displayName;
+        }
+      }
+      
       // Capitalize first letter and handle special cases
-      if (domain === 'kohls') return "Kohl's";
-      return domain.charAt(0).toUpperCase() + domain.slice(1);
+      const specialCases = {
+        'kohls': "Kohl's",
+        'macys': "Macy's",
+        'jcpenney': "JCPenney",
+        'dicks': "Dick's",
+        'bedbathandbeyond': "Bed Bath & Beyond",
+      };
+      
+      if (specialCases[domain]) {
+        return specialCases[domain];
+      }
+      
+      // Convert camelCase or hyphenated domains to readable format
+      const readable = domain
+        .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase -> camel Case
+        .replace(/-/g, ' ') // hyphens -> spaces
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      return readable || domain.charAt(0).toUpperCase() + domain.slice(1);
     }
     
     return 'Other Retailer';
@@ -599,6 +783,13 @@ function extractRetailerName(url) {
     const match = url.match(/(?:www\.)?([^.]+)\.[^.]+/);
     if (match && match[1]) {
       const domain = match[1].toLowerCase();
+      // Check against retailer map
+      for (const [pattern, displayName] of Object.entries(RETAILER_MAP)) {
+        if (domain.includes(pattern)) {
+          return displayName;
+        }
+      }
+      // Special cases
       if (domain === 'kohls') return "Kohl's";
       return domain.charAt(0).toUpperCase() + domain.slice(1);
     }
@@ -867,9 +1058,76 @@ function generateFallbackResults(productInfo) {
 }
 
 /**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(str1, str2) {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(null));
+  
+  for (let i = 0; i <= len1; i++) matrix[0][i] = i;
+  for (let j = 0; j <= len2; j++) matrix[j][0] = j;
+  
+  for (let j = 1; j <= len2; j++) {
+    for (let i = 1; i <= len1; i++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1,      // deletion
+        matrix[j - 1][i] + 1,      // insertion
+        matrix[j - 1][i - 1] + cost // substitution
+      );
+    }
+  }
+  
+  return matrix[len2][len1];
+}
+
+/**
+ * Calculate Jaccard similarity coefficient (token-based)
+ */
+function jaccardSimilarity(tokens1, tokens2) {
+  const set1 = new Set(tokens1);
+  const set2 = new Set(tokens2);
+  
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  
+  return union.size > 0 ? intersection.size / union.size : 0;
+}
+
+/**
+ * Extract model numbers, SKUs, and UPCs from title
+ */
+function extractModelNumbers(title) {
+  const patterns = [
+    /\b[A-Z]{2,5}-?[0-9]{4,8}\b/g,           // Pattern: ABC-1234, ABC1234
+    /\b[0-9]{4,}[A-Z]{1,3}\b/g,              // Pattern: 1234ABC
+    /\b[A-Z0-9]{6,12}\b/g,                   // Generic alphanumeric codes
+    /#[A-Z0-9-]+\b/g,                        // Pattern: #ABC-123
+    /\b[A-Z]+[0-9]+[A-Z]*\b/g,               // Pattern: ABC123, ABC123D
+    /\b[0-9]{12,14}\b/g,                     // UPC codes (12-14 digits)
+  ];
+  
+  const models = new Set();
+  patterns.forEach(pattern => {
+    const matches = title.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        // Filter out very common words that match patterns
+        if (match.length >= 4 && !/^(THE|AND|FOR|WITH)$/i.test(match)) {
+          models.add(match.toUpperCase().replace(/[^\w]/g, ''));
+        }
+      });
+    }
+  });
+  
+  return Array.from(models);
+}
+
+/**
  * Calculate title similarity to determine if products are the same or similar
  * Returns a score between 0 and 1 (1 = identical, 0 = completely different)
- * Improved to better detect same products vs similar ones
+ * Uses hybrid scoring with multiple algorithms for better accuracy
  */
 function calculateTitleSimilarity(title1, title2, currentProduct = null) {
   if (!title1 || !title2) return 0;
@@ -890,7 +1148,26 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
     return 0.95; // Same product, just different description length
   }
   
-  // Extract brand from current product if available
+  // A. Model Number Matching (40% weight if match found)
+  const models1 = extractModelNumbers(title1);
+  const models2 = extractModelNumbers(title2);
+  let modelMatchScore = 0;
+  
+  if (models1.length > 0 && models2.length > 0) {
+    const matchingModels = models1.some(m1 => 
+      models2.some(m2 => m1 === m2 || m1.includes(m2) || m2.includes(m1))
+    );
+    if (matchingModels) {
+      modelMatchScore = 0.95; // Strong signal - same model number = same product
+    }
+  }
+  
+  // If model numbers match, return high similarity immediately
+  if (modelMatchScore > 0) {
+    return modelMatchScore;
+  }
+  
+  // B. Brand Matching (30% weight)
   let brand = null;
   if (currentProduct && currentProduct.brand) {
     brand = normalize(currentProduct.brand);
@@ -900,72 +1177,70 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
     brand = firstWords;
   }
   
-  // Check if both titles contain the brand (strong indicator of same product)
   const hasBrand1 = brand && normalized1.includes(brand);
   const hasBrand2 = brand && normalized2.includes(brand);
   const bothHaveBrand = hasBrand1 && hasBrand2;
+  const brandMatchScore = bothHaveBrand ? 0.8 : 0.3;
   
-  // Extract model numbers / product codes (alphanumeric sequences)
-  const extractCodes = (str) => {
-    // Match patterns like: SX1234, DR-1234, 123456, etc.
-    return str.match(/\b[A-Z0-9]{3,}[-\s]?[A-Z0-9]{2,}\b/gi) || [];
-  };
-  
-  const codes1 = extractCodes(title1);
-  const codes2 = extractCodes(title2);
-  
-  // If same model codes exist, it's the same product
-  if (codes1.length > 0 && codes2.length > 0) {
-    const matchingCodes = codes1.some(code1 => 
-      codes2.some(code2 => normalize(code1) === normalize(code2))
-    );
-    if (matchingCodes) {
-      return 0.95; // Same product code/model number
-    }
-  }
-  
-  // Extract key product words (exclude common words)
-  const commonWords = new Set(['the', 'and', 'or', 'for', 'with', 'pack', 'pairs', 'pair', 'set', 'bundle']);
-  const extractKeyWords = (str) => {
+  // C. Token-Based Jaccard Similarity (20% weight)
+  const commonWords = new Set(['the', 'and', 'or', 'for', 'with', 'pack', 'pairs', 'pair', 'set', 'bundle', 'of', 'a', 'an', 'in', 'on', 'at']);
+  const extractTokens = (str) => {
     return str.split(/\s+/)
       .filter(word => word.length > 2 && !commonWords.has(word))
-      .slice(0, 8); // First 8 meaningful words
+      .map(word => word.toLowerCase());
   };
   
-  const keywords1 = extractKeyWords(normalized1);
-  const keywords2 = extractKeyWords(normalized2);
+  const tokens1 = extractTokens(normalized1);
+  const tokens2 = extractTokens(normalized2);
+  const jaccardScore = jaccardSimilarity(tokens1, tokens2);
   
-  // Count matching keywords
-  const set1 = new Set(keywords1);
-  const set2 = new Set(keywords2);
-  let matches = 0;
-  for (const word of set1) {
-    if (set2.has(word)) {
-      matches++;
-    }
+  // D. Levenshtein Distance Similarity (10% weight)
+  const maxLen = Math.max(normalized1.length, normalized2.length);
+  const editDistance = levenshteinDistance(normalized1, normalized2);
+  const levenshteinScore = maxLen > 0 ? 1 - (editDistance / maxLen) : 0;
+  
+  // Hybrid scoring with weighted averages
+  // Adjust weights based on available signals
+  let finalScore = 0;
+  let totalWeight = 0;
+  
+  // Model number (if available, already returned above)
+  // Brand match weight: 30%
+  finalScore += brandMatchScore * 0.3;
+  totalWeight += 0.3;
+  
+  // Jaccard similarity weight: 40% (increased since no model match)
+  finalScore += jaccardScore * 0.4;
+  totalWeight += 0.4;
+  
+  // Levenshtein weight: 30% (increased since no model match)
+  finalScore += levenshteinScore * 0.3;
+  totalWeight += 0.3;
+  
+  // Normalize by total weight
+  finalScore = totalWeight > 0 ? finalScore / totalWeight : 0;
+  
+  // Boost if both have brand and high token similarity
+  if (bothHaveBrand && jaccardScore > 0.5) {
+    finalScore = Math.min(0.95, finalScore + 0.1);
   }
   
-  // Calculate base similarity
-  const totalUnique = new Set([...keywords1, ...keywords2]).size;
-  let similarity = totalUnique > 0 ? matches / totalUnique : 0;
-  
-  // Boost similarity if both have the brand
-  if (bothHaveBrand && similarity > 0.3) {
-    similarity = Math.min(0.95, similarity + 0.2);
+  // Penalize if no brand match but otherwise similar (might be different products)
+  if (!bothHaveBrand && jaccardScore > 0.6) {
+    finalScore = Math.max(0, finalScore - 0.1);
   }
   
-  // If high keyword overlap and both have brand, treat as same product
-  if (bothHaveBrand && matches >= 4 && similarity > 0.5) {
-    similarity = Math.max(0.85, similarity);
-  }
-  
-  return similarity;
+  return Math.min(1.0, Math.max(0.0, finalScore));
 }
 
 /**
  * Display comparison results in the modal
+ * @param {Array} results - Array of result objects
+ * @param {Object} currentProduct - Current product info
+ * @param {HTMLElement} modal - Modal element
+ * @param {boolean} isCached - Whether results are from cache
  */
-function displayComparisonResults(results, currentProduct, modal) {
+function displayComparisonResults(results, currentProduct, modal, isCached = false) {
   const body = modal.querySelector('#supershopper-modal-body');
   if (!body) return;
   
@@ -994,13 +1269,38 @@ function displayComparisonResults(results, currentProduct, modal) {
   // Sort similar products by similarity (highest first)
   similarProducts.sort((a, b) => b.similarity - a.similarity);
   
+  // Get unique retailer names for filter dropdown
+  const allRetailers = [...new Set(results.map(r => r.retailer).filter(Boolean))].sort();
+  
+  // Store original results in data attribute for filtering
+  const containerId = 'supershopper-results-container-' + Date.now();
+  
   // Create comparison container
   let html = `
-    <div class="supershopper-comparison-container">
+    <div class="supershopper-comparison-container" id="${containerId}">
+      ${isCached ? '<div class="supershopper-cache-indicator" title="Results from cache (may be up to 24 hours old)">📦 Cached results</div>' : ''}
       <div class="supershopper-product-header">
         <h3 class="supershopper-product-title">${escapeHtml(currentProduct.title)}</h3>
         ${currentProduct.imageUrl ? `<img src="${escapeUrlForAttribute(currentProduct.imageUrl)}" alt="${escapeHtml(currentProduct.title)}" class="supershopper-product-image" />` : ''}
       </div>
+      <div class="supershopper-controls" data-container-id="${containerId}">
+        <div class="supershopper-filter-group">
+          <label for="supershopper-filter-retailer">Filter:</label>
+          <select id="supershopper-filter-retailer" class="supershopper-filter-select">
+            <option value="all">All retailers</option>
+            ${allRetailers.map(retailer => `<option value="${escapeHtml(retailer)}">${escapeHtml(retailer)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="supershopper-sort-group">
+          <label for="supershopper-sort-by">Sort:</label>
+          <select id="supershopper-sort-by" class="supershopper-sort-select">
+            <option value="relevance">Relevance (default)</option>
+            <option value="retailer-az">Retailer name (A-Z)</option>
+            <option value="retailer-za">Retailer name (Z-A)</option>
+          </select>
+        </div>
+      </div>
+      <div class="supershopper-results-wrapper" data-original-same="${JSON.stringify(sameProducts).replace(/"/g, '&quot;')}" data-original-similar="${JSON.stringify(similarProducts).replace(/"/g, '&quot;')}" data-current-product="${JSON.stringify(currentProduct).replace(/"/g, '&quot;')}">
   `;
   
   // SECTION 1: Same Product (simpler table, no images needed)
@@ -1071,12 +1371,199 @@ function displayComparisonResults(results, currentProduct, modal) {
     `;
   }
   
-  html += `</div>`;
+  html += `
+      </div>
+    </div>`;
   
   body.innerHTML = html;
   
+  // Add event handlers for filter and sort
+  const filterSelect = body.querySelector('#supershopper-filter-retailer');
+  const sortSelect = body.querySelector('#supershopper-sort-by');
+  const resultsWrapper = body.querySelector('.supershopper-results-wrapper');
+  
+  if (filterSelect) {
+    filterSelect.addEventListener('change', () => {
+      applyFiltersAndSort(body, resultsWrapper, filterSelect.value, sortSelect.value, currentProduct);
+    });
+  }
+  
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      applyFiltersAndSort(body, resultsWrapper, filterSelect.value, sortSelect.value, currentProduct);
+    });
+  }
+  
   // Add smooth scroll to top
   body.scrollTop = 0;
+}
+
+/**
+ * Apply filter and sort to results and re-render
+ */
+function applyFiltersAndSort(body, resultsWrapper, retailerFilter, sortBy, currentProduct) {
+  try {
+    // Get original data - unescape HTML entities in JSON
+    const sameAttr = resultsWrapper.getAttribute('data-original-same') || '[]';
+    const similarAttr = resultsWrapper.getAttribute('data-original-similar') || '[]';
+    const originalSame = JSON.parse(sameAttr.replace(/&quot;/g, '"'));
+    const originalSimilar = JSON.parse(similarAttr.replace(/&quot;/g, '"'));
+    
+    // Filter results
+    let filteredSame = retailerFilter === 'all' 
+      ? originalSame 
+      : originalSame.filter(r => r.retailer === retailerFilter);
+    
+    let filteredSimilar = retailerFilter === 'all'
+      ? originalSimilar
+      : originalSimilar.filter(r => r.retailer === retailerFilter);
+    
+    // Sort results
+    if (sortBy === 'retailer-az') {
+      filteredSame = [...filteredSame].sort((a, b) => (a.retailer || '').localeCompare(b.retailer || ''));
+      filteredSimilar = [...filteredSimilar].sort((a, b) => (a.retailer || '').localeCompare(b.retailer || ''));
+    } else if (sortBy === 'retailer-za') {
+      filteredSame = [...filteredSame].sort((a, b) => (b.retailer || '').localeCompare(a.retailer || ''));
+      filteredSimilar = [...filteredSimilar].sort((a, b) => (b.retailer || '').localeCompare(a.retailer || ''));
+    } else {
+      // Relevance: keep same products in original order, sort similar by similarity
+      filteredSimilar.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
+    }
+    
+    // Re-render results sections
+    const container = resultsWrapper.closest('.supershopper-comparison-container');
+    const sameSection = container.querySelector('.supershopper-section:first-of-type');
+    const similarSection = container.querySelector('.supershopper-section:last-of-type');
+    
+    // Update same products section
+    if (sameSection && filteredSame.length > 0) {
+      let sameHtml = `
+        <h4 class="supershopper-section-title">Available at these retailers</h4>
+        <table class="supershopper-comparison-table">
+          <thead>
+            <tr>
+              <th>Retailer</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      filteredSame.forEach(result => {
+        sameHtml += `
+          <tr class="${result.isCurrentPage ? 'supershopper-current-row' : ''}">
+            <td>
+              <div class="supershopper-retailer-cell">
+                ${result.isCurrentPage ? '<span class="supershopper-price-indicator same">✓</span>' : ''}
+                <strong>${escapeHtml(result.retailer)}</strong>
+              </div>
+            </td>
+            <td>
+              ${result.isCurrentPage 
+                ? '<span class="supershopper-current-badge">You are here</span>' 
+                : `<a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
+              }
+            </td>
+          </tr>
+        `;
+      });
+      
+      sameHtml += `
+          </tbody>
+        </table>
+      `;
+      
+      sameSection.innerHTML = sameHtml;
+    } else if (sameSection && filteredSame.length === 0) {
+      sameSection.style.display = 'none';
+    } else if (!sameSection && filteredSame.length > 0) {
+      // Section was hidden, recreate it
+      const sameHtml = `
+        <div class="supershopper-section">
+          <h4 class="supershopper-section-title">Available at these retailers</h4>
+          <table class="supershopper-comparison-table">
+            <thead>
+              <tr>
+                <th>Retailer</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredSame.map(result => `
+                <tr class="${result.isCurrentPage ? 'supershopper-current-row' : ''}">
+                  <td>
+                    <div class="supershopper-retailer-cell">
+                      ${result.isCurrentPage ? '<span class="supershopper-price-indicator same">✓</span>' : ''}
+                      <strong>${escapeHtml(result.retailer)}</strong>
+                    </div>
+                  </td>
+                  <td>
+                    ${result.isCurrentPage 
+                      ? '<span class="supershopper-current-badge">You are here</span>' 
+                      : `<a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>`
+                    }
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      resultsWrapper.insertAdjacentHTML('afterbegin', sameHtml);
+    }
+    
+    // Update similar products section
+    if (similarSection && filteredSimilar.length > 0) {
+      let similarHtml = `
+        <h4 class="supershopper-section-title">Similar products</h4>
+        <div class="supershopper-similar-products">
+      `;
+      
+      filteredSimilar.forEach(result => {
+        similarHtml += `
+          <div class="supershopper-similar-product-card">
+            ${result.imageUrl ? `<img src="${escapeUrlForAttribute(result.imageUrl)}" alt="${escapeHtml(result.title)}" class="supershopper-similar-product-image" />` : '<div class="supershopper-similar-product-image-placeholder">No image</div>'}
+            <div class="supershopper-similar-product-info">
+              <div class="supershopper-similar-product-title">${escapeHtml(result.title)}</div>
+              <div class="supershopper-similar-product-retailer">${escapeHtml(result.retailer)}</div>
+              <a href="${escapeUrlForAttribute(result.url)}" target="_blank" class="supershopper-visit-btn">Visit Store</a>
+            </div>
+          </div>
+        `;
+      });
+      
+      similarHtml += `
+        </div>
+      `;
+      
+      similarSection.innerHTML = similarHtml;
+    } else if (similarSection && filteredSimilar.length === 0) {
+      similarSection.style.display = 'none';
+    }
+    
+    // Show message if no results
+    if (filteredSame.length === 0 && filteredSimilar.length === 0) {
+      const noResultsMsg = container.querySelector('.supershopper-no-results');
+      if (!noResultsMsg) {
+        const msg = document.createElement('div');
+        msg.className = 'supershopper-no-results';
+        msg.style.cssText = 'text-align: center; padding: 40px; color: #666;';
+        msg.textContent = 'No results match the selected filter.';
+        resultsWrapper.appendChild(msg);
+      }
+    } else {
+      const noResultsMsg = container.querySelector('.supershopper-no-results');
+      if (noResultsMsg) {
+        noResultsMsg.remove();
+      }
+      // Restore sections if they were hidden
+      if (sameSection) sameSection.style.display = '';
+      if (similarSection) similarSection.style.display = '';
+    }
+    
+  } catch (error) {
+    console.error('Error applying filters:', error);
+  }
 }
 
 /**
@@ -1170,7 +1657,11 @@ function checkAndInjectButton() {
   const hostname = window.location.hostname.toLowerCase();
   if (!hostname.includes('amazon.') && 
       !hostname.includes('target.') && 
-      !hostname.includes('walmart.')) {
+      !hostname.includes('walmart.') &&
+      !hostname.includes('bestbuy.') &&
+      !hostname.includes('best-buy.') &&
+      !hostname.includes('ebay.') &&
+      !hostname.includes('costco.')) {
     return;
   }
   
