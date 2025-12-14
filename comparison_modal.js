@@ -1167,16 +1167,6 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
     return modelMatchScore;
   }
   
-  // Also check if brand + model numbers both match (even stronger signal)
-  if (bothHaveBrand && models1.length > 0 && models2.length > 0) {
-    const matchingModels = models1.some(m1 => 
-      models2.some(m2 => m1 === m2 || m1.includes(m2) || m2.includes(m1))
-    );
-    if (matchingModels) {
-      return 0.98; // Very strong signal - brand + model match
-    }
-  }
-  
   // B. Brand Matching (30% weight)
   let brand = null;
   if (currentProduct && currentProduct.brand) {
