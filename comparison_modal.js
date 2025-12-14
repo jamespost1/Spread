@@ -1101,8 +1101,8 @@ function jaccardSimilarity(tokens1, tokens2) {
 function extractModelNumbers(title) {
   const patterns = [
     /\b[A-Z]{2,5}-?[0-9]{4,8}\b/g,           // Pattern: ABC-1234, ABC1234
-    /\b[0-9]{4,}[A-Z]{1,3}\b/g,              // Pattern: 1234ABC
-    /\b[A-Z0-9]{6,12}\b/g,                   // Generic alphanumeric codes
+    /\b[0-9]{3,}[A-Z]{1,4}\b/g,              // Pattern: 123ABC, 520BT (CHANGED: 3+ digits instead of 4+)
+    /\b[A-Z0-9]{5,12}\b/g,                   // Generic alphanumeric codes (CHANGED: 5+ instead of 6+ to catch 520BT)
     /#[A-Z0-9-]+\b/g,                        // Pattern: #ABC-123
     /\b[A-Z]+[0-9]+[A-Z]*\b/g,               // Pattern: ABC123, ABC123D
     /\b[0-9]{12,14}\b/g,                     // UPC codes (12-14 digits)
@@ -1165,6 +1165,16 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
   // If model numbers match, return high similarity immediately
   if (modelMatchScore > 0) {
     return modelMatchScore;
+  }
+  
+  // Also check if brand + model numbers both match (even stronger signal)
+  if (bothHaveBrand && models1.length > 0 && models2.length > 0) {
+    const matchingModels = models1.some(m1 => 
+      models2.some(m2 => m1 === m2 || m1.includes(m2) || m2.includes(m1))
+    );
+    if (matchingModels) {
+      return 0.98; // Very strong signal - brand + model match
+    }
   }
   
   // B. Brand Matching (30% weight)
@@ -1256,9 +1266,9 @@ function displayComparisonResults(results, currentProduct, modal, isCached = fal
       // Calculate similarity to current product (pass currentProduct for brand matching)
       const similarity = calculateTitleSimilarity(currentProduct.title, result.title, currentProduct);
       
-      // Higher threshold (0.75) to be more strict about "same product"
-      // This prevents same products from appearing in "similar" section
-      if (similarity > 0.75) {
+      // Lower threshold to 0.70 to be more inclusive (same products often have slightly different titles)
+      // Model number matches will push this over 0.95 anyway
+      if (similarity > 0.70) {  // CHANGED: from 0.75 to 0.70
         sameProducts.push({ ...result, similarity });
       } else {
         similarProducts.push({ ...result, similarity });
