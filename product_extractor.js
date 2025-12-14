@@ -463,6 +463,7 @@ function extractBestBuyProduct() {
     
     // Price
     const priceSelectors = [
+      '.price-block-customer-price',
       '.priceView-customer-price span[aria-hidden="true"]',
       '.priceView-customer-price',
       '.priceView-price .priceView-customer-price',
