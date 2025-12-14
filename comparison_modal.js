@@ -1008,6 +1008,21 @@ function extractPriceFromItemTextOnly(item, referencePrice = null) {
  * Extract image URL from shopping result
  */
 function extractImageUrl(item) {
+  // Priority 1: Check for Open Graph image in metatags (usually the primary product image)
+  if (item.pagemap && item.pagemap.metatags) {
+    const metatags = Array.isArray(item.pagemap.metatags) ? item.pagemap.metatags : [item.pagemap.metatags];
+    for (const meta of metatags) {
+      if (meta['og:image']) {
+        return meta['og:image'];
+      }
+      // Also check for Twitter card image as fallback
+      if (meta['twitter:image']) {
+        return meta['twitter:image'];
+      }
+    }
+  }
+  
+  // Priority 2: Check cse_image (first one should be primary)
   if (item.pagemap && item.pagemap.cse_image) {
     const images = Array.isArray(item.pagemap.cse_image) ? item.pagemap.cse_image : [item.pagemap.cse_image];
     if (images.length > 0 && images[0].src) {
@@ -1015,6 +1030,7 @@ function extractImageUrl(item) {
     }
   }
   
+  // Priority 3: Check product.image (first one)
   if (item.pagemap && item.pagemap.product) {
     const products = Array.isArray(item.pagemap.product) ? item.pagemap.product : [item.pagemap.product];
     for (const product of products) {
@@ -1172,6 +1188,28 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
     return modelMatchScore;
   }
   
+  // Extract count/quantity indicators (e.g., "150 Count", "2-Pack", "24 oz")
+  const extractCounts = (str) => {
+    const countPatterns = [
+      /\b(\d+)\s*(?:count|pack|piece|ct|pk|oz|fl oz|ml|lb|lbs|kg|g)\b/gi,
+      /\b(\d+)-pack\b/gi,
+      /\b(\d+)\s*x\s*\d+/gi, // e.g., "12 x 2"
+    ];
+    const counts = new Set();
+    countPatterns.forEach(pattern => {
+      const matches = str.match(pattern);
+      if (matches) {
+        matches.forEach(match => counts.add(match.toLowerCase()));
+      }
+    });
+    return Array.from(counts);
+  };
+  
+  const counts1 = extractCounts(title1);
+  const counts2 = extractCounts(title2);
+  const matchingCounts = counts1.length > 0 && counts2.length > 0 && 
+    counts1.some(c1 => counts2.some(c2 => c1 === c2));
+  
   // B. Brand Matching (30% weight)
   let brand = null;
   if (currentProduct && currentProduct.brand) {
@@ -1228,6 +1266,15 @@ function calculateTitleSimilarity(title1, title2, currentProduct = null) {
   // Boost if both have brand and high token similarity
   if (bothHaveBrand && jaccardScore > 0.5) {
     finalScore = Math.min(0.95, finalScore + 0.1);
+  }
+  
+  // Strong boost if brand + count/size both match (very likely same product)
+  if (bothHaveBrand && matchingCounts && jaccardScore > 0.4) {
+    finalScore = Math.min(0.95, finalScore + 0.2);
+    // If brand + count match, it's almost certainly the same product
+    if (finalScore > 0.65) {
+      return finalScore;
+    }
   }
   
   // Penalize if no brand match but otherwise similar (might be different products)
