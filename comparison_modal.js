@@ -297,6 +297,21 @@ function getAPIConfig() {
 }
 
 /**
+ * Domains to exclude when searching, keyed by the retailer label that
+ * product_extractor.js sets on the extracted product. Every retailer we
+ * extract from needs an entry here, otherwise the search returns the site
+ * the user is already on.
+ */
+const SOURCE_RETAILER_DOMAINS = {
+  'amazon': 'amazon.com',
+  'target': 'target.com',
+  'walmart': 'walmart.com',
+  'best buy': 'bestbuy.com',
+  'ebay': 'ebay.com',
+  'costco': 'costco.com',
+};
+
+/**
  * Build search query from product info
  */
 function buildSearchQuery(productInfo) {
@@ -329,13 +344,9 @@ function buildSearchQuery(productInfo) {
   // Exclude current retailer from search to get more diverse results
   // This prevents Amazon results when searching from Amazon, etc.
   if (productInfo.retailer) {
-    const retailerLower = productInfo.retailer.toLowerCase();
-    if (retailerLower === 'amazon') {
-      finalQuery = `${finalQuery} -site:amazon.com`;
-    } else if (retailerLower === 'walmart') {
-      finalQuery = `${finalQuery} -site:walmart.com`;
-    } else if (retailerLower === 'target') {
-      finalQuery = `${finalQuery} -site:target.com`;
+    const excludedDomain = SOURCE_RETAILER_DOMAINS[productInfo.retailer.toLowerCase()];
+    if (excludedDomain) {
+      finalQuery = `${finalQuery} -site:${excludedDomain}`;
     }
   }
   

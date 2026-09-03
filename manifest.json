@@ -2,14 +2,13 @@
   "manifest_version": 3,
   "name": "Super Shopper — Online Shopping Assistant (MVP)",
   "version": "0.2.0",
-  "description": "Compare prices across multiple retailers to find the best deals.",
+  "description": "Discover which other retailers carry the product you're viewing.",
   "permissions": [
     "storage",
     "activeTab",
     "scripting"
   ],
   "host_permissions": [
-    "<all_urls>",
     "https://www.googleapis.com/*"
   ],
   "background": {
@@ -21,7 +20,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.target.com/*",
+        "*://*.walmart.com/*",
+        "*://*.bestbuy.com/*",
+        "*://*.ebay.com/*",
+        "*://*.costco.com/*"
+      ],
       "js": ["price_utils.js", "product_extractor.js", "comparison_modal.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
