@@ -6,12 +6,15 @@
 // Request flow:
 //   1. Offer cache hit?              -> return immediately, no upstream calls.
 //   2. Fan out to retailer adapters  -> free first-party APIs, in parallel.
-//   3. Match candidates against the source product.
-//   4. Cache and return.
+//   3. Stage 1 match (deterministic) -> resolves most candidates for free.
+//   4. Stage 2 match (LLM)           -> only the ambiguous ones, batched+capped.
+//   5. Cache and return.
 
 import { partitionCandidates, VERDICT } from '../../src/core/matching.js';
 import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
+import { adjudicate } from './adjudicator.js';
+import { budgetStatus, dailyLimitFrom } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
 import { handleChallenge, handleNotification } from './ebay-compliance.js';
 
@@ -26,7 +29,7 @@ export default {
 
     try {
       if (url.pathname === '/health') {
-        return corsResponse(env, json(health(env)));
+        return corsResponse(env, json(await health(env)));
       }
       if (url.pathname === '/v1/compare' && request.method === 'POST') {
         return corsResponse(env, await handleCompare(request, env, ctx));
@@ -83,13 +86,13 @@ async function handleCompare(request, env, ctx) {
   };
   const candidates = [...settledValue(bestBuy), ...settledValue(ebay)];
 
-  // --- Match ---------------------------------------------------------------
-  // Candidates the matcher cannot resolve are held back rather than guessed at.
-  // A wrong "same product" shows a shopper a price for something they are not
-  // looking at, which is the worst output this service can produce.
+  // --- Stage 1: deterministic ---------------------------------------------
   const { resolved, ambiguous } = partitionCandidates(product, candidates);
 
-  const offers = [...resolved]
+  // --- Stage 2: LLM, only for what Stage 1 could not decide ----------------
+  const { candidates: judged, stats } = await adjudicate(product, ambiguous, env);
+
+  const offers = [...resolved, ...judged]
     .filter((c) => c.match?.verdict === VERDICT.SAME || c.match?.verdict === VERDICT.SIMILAR)
     .filter((c) => c.url && Number.isFinite(c.price))
     .sort(byRelevanceThenPrice)
@@ -100,8 +103,9 @@ async function handleCompare(request, env, ctx) {
     sources,
     matching: {
       candidates: candidates.length,
-      resolved: resolved.length,
-      unresolved: ambiguous.length,
+      resolvedByHeuristics: resolved.length,
+      sentToAdjudicator: ambiguous.length,
+      ...stats,
     },
     generatedAt: new Date().toISOString(),
   };
@@ -118,9 +122,10 @@ function byRelevanceThenPrice(a, b) {
   return byRank !== 0 ? byRank : a.price - b.price;
 }
 
-function health(env) {
+async function health(env) {
   return {
     status: 'ok',
+    adjudication: await budgetStatus(env.SPREAD_KV, dailyLimitFrom(env)),
     retailers: {
       bestbuy: Boolean(env.BESTBUY_API_KEY),
       ebay: Boolean(env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET),
