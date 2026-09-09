@@ -29,9 +29,12 @@ Upload it in the developer console and fill in the listing. Keep the item ID fro
   - `storage` — persists the user's local savings total and settings.
   - `activeTab` — lets the toolbar popup report whether Spread is active on the current tab.
   - Host permissions — reads the product title and price on the six supported retailer sites.
-- **Data disclosure:** answer *no* to every collection category except "Website content", which is
-  used only to perform the comparison the user requested, is not sold, and is not used for
-  creditworthiness or unrelated purposes.
+- **Data disclosure:** answer *no* to every collection category except "Website content".
+  Declare that it is transferred off-device, and be precise about when: product title and price are
+  sent on product-page views at the six supported retailers, not only on click. Stored records carry
+  no user identifier. It is not sold, not used for creditworthiness, and not used for any purpose
+  unrelated to the extension's single purpose. The privacy policy spells this out -- keep the two
+  consistent, since a mismatch between them is a common rejection reason.
 
 ### Assets you need
 
