@@ -22,7 +22,7 @@ Upload it in the developer console and fill in the listing. Keep the item ID fro
 
 - **Name:** Spread — Real prices across retailers
 - **Category:** Shopping
-- **Privacy policy URL:** `https://jamespost1.github.io/spread/privacy.html`
+- **Privacy policy URL:** `https://jamespost1.github.io/Spread/privacy.html`
   (enable GitHub Pages on the `docs/` folder first)
 - **Single purpose:** "Show the price of the product the user is viewing at other retailers."
 - **Permission justifications:**
