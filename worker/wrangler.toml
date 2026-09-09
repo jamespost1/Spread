@@ -1,0 +1,33 @@
+name = "spread-api"
+main = "src/index.js"
+compatibility_date = "2026-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Public, non-secret configuration.
+[vars]
+# Hard ceiling on LLM adjudication calls per UTC day. At roughly $0.0017 per
+# batched call, 200 is about $0.34/day worst case -- and the verdict cache means
+# real usage sits far below the cap. Raise deliberately.
+ADJUDICATION_DAILY_LIMIT = "200"
+ADJUDICATOR_MODEL = "claude-haiku-4-5"
+# Set to chrome-extension://<published-id> after the first Web Store release.
+ALLOWED_ORIGIN = "*"
+
+# Shared cache: offers (6h), match verdicts (90d), OAuth tokens, budget counters.
+[[kv_namespaces]]
+binding = "SPREAD_KV"
+id = "PLACEHOLDER_RUN_WRANGLER_KV_NAMESPACE_CREATE"
+
+# Secrets -- set with `wrangler secret put <NAME>`, never committed:
+#   BESTBUY_API_KEY      https://developer.bestbuy.com/
+#   EBAY_CLIENT_ID       https://developer.ebay.com/ (Browse API keyset)
+#   EBAY_CLIENT_SECRET
+#   ANTHROPIC_API_KEY    https://console.anthropic.com/ (optional -- without it
+#                        the cascade runs heuristics-only and stays free)
+#   EBAY_VERIFICATION_TOKEN  Any 32-80 char alphanumeric string you invent. Paste
+#                        the same value into eBay's developer console alongside
+#                        the notification endpoint URL.
+
+# Must match the notification URL registered with eBay exactly -- it is part of
+# the verification hash. Set after the Worker has its final URL.
+# EBAY_NOTIFICATION_ENDPOINT = "https://spread-api.<subdomain>.workers.dev/ebay/account-deletion" 
