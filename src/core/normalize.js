@@ -67,6 +67,22 @@ const MODEL_FALSE_POSITIVES = new Set([
 ]);
 
 /**
+ * A number followed by a unit is a specification, not an identifier.
+ *
+ * This matters more than it looks. "512GB" satisfies the generic alphanumeric
+ * model pattern, so without this filter two entirely different Dell laptops
+ * that both mention 512GB share a "model code" and get confirmed as the same
+ * product -- a false match of exactly the kind the matcher exists to prevent.
+ */
+const MEASUREMENT = new RegExp(
+  '^[0-9]+(?:\\.[0-9]+)?(' +
+    'GB|TB|MB|KB|GHZ|MHZ|KHZ|HZ|MM|CM|IN|FT|OZ|FLOZ|ML|LB|LBS|KG|' +
+    'WATT|WATTS|MAH|AH|WH|VOLT|VOLTS|PSI|RPM|BTU|MP|NM|DPI|PPI|' +
+    'CT|PK|PC|QT|GAL|W|V|K|P' +
+  ')$'
+);
+
+/**
  * Extract candidate model numbers / SKUs from a title.
  * @param {string} title
  * @returns {string[]} Uppercased, punctuation-stripped codes.
@@ -88,6 +104,8 @@ export function extractModelNumbers(title) {
       if (MODEL_FALSE_POSITIVES.has(code)) continue;
       // A code made only of letters is a word, not a model number.
       if (!/[0-9]/.test(code)) continue;
+      // A capacity, size or wattage identifies a variant, not a product.
+      if (MEASUREMENT.test(code)) continue;
       models.add(code);
     }
   }
