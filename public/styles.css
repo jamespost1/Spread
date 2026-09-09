@@ -1,0 +1,126 @@
+/* Injected into retailer pages. Every selector is prefixed and every value is
+   explicit, because these rules live inside someone else's stylesheet and must
+   neither inherit from it nor leak into it. */
+
+.spread-trigger {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 !important;
+  padding: 8px 14px !important;
+  border-radius: 8px !important;
+  background: #0b6b3a !important;
+  color: #ffffff !important;
+  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  cursor: pointer !important;
+  transition: background 120ms ease;
+}
+.spread-trigger:hover { background: #0d7d44 !important; }
+.spread-trigger:focus-visible { outline: 2px solid #0b6b3a !important; outline-offset: 2px !important; }
+
+.spread-panel {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(12, 16, 21, 0.55) !important;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  color: #10151c !important;
+}
+
+.spread-card {
+  width: min(560px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff !important;
+  border-radius: 14px !important;
+  box-shadow: 0 24px 64px rgba(8, 12, 18, 0.28) !important;
+  overflow: hidden;
+}
+
+.spread-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 16px 18px; border-bottom: 1px solid #e4e8ee !important;
+}
+.spread-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.spread-logo { font-size: 15px; font-weight: 660; letter-spacing: -0.01em; color: #10151c !important; }
+.spread-subtitle { font-size: 12px; color: #5b6672 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.spread-close {
+  all: unset;
+  cursor: pointer; padding: 2px 8px; border-radius: 6px;
+  font-size: 22px; line-height: 1; color: #5b6672 !important;
+}
+.spread-close:hover { background: #f2f4f7 !important; color: #10151c !important; }
+.spread-close:focus-visible { outline: 2px solid #0b6b3a !important; }
+
+.spread-body { overflow-y: auto; padding: 4px 18px 18px; }
+
+.spread-verdict { padding: 18px 0 14px; border-bottom: 1px solid #e4e8ee !important; }
+.spread-verdict-amount { font-size: 22px; font-weight: 660; letter-spacing: -0.02em; color: #10151c !important; }
+.spread-verdict.is-saving .spread-verdict-amount { color: #0b6b3a !important; }
+.spread-verdict-detail { margin-top: 3px; font-size: 13px; color: #5b6672 !important; }
+
+.spread-section { padding-top: 16px; }
+.spread-section-title {
+  margin: 0 0 8px !important; font-size: 11px !important; font-weight: 620 !important;
+  text-transform: uppercase; letter-spacing: 0.06em; color: #5b6672 !important;
+}
+
+.spread-offers { list-style: none !important; margin: 0 !important; padding: 0 !important; }
+.spread-offer {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 11px 0; border-bottom: 1px solid #f0f2f5 !important;
+}
+.spread-offer:last-child { border-bottom: none !important; }
+.spread-offer-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.spread-offer-retailer { font-size: 13px; font-weight: 600; color: #10151c !important; }
+.spread-offer-title { font-size: 12px; color: #5b6672 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spread-offer-note { font-size: 11px; color: #8a94a0 !important; }
+
+.spread-offer-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.spread-offer-price { font-size: 15px; font-weight: 620; font-variant-numeric: tabular-nums; color: #10151c !important; }
+.spread-offer-delta { font-size: 12px; font-weight: 560; font-variant-numeric: tabular-nums; }
+.spread-offer-delta.is-cheaper { color: #0b6b3a !important; }
+.spread-offer-delta.is-pricier { color: #8a94a0 !important; }
+
+.spread-offer-link {
+  padding: 6px 12px !important; border-radius: 7px !important;
+  border: 1px solid #d6dbe2 !important; background: #ffffff !important;
+  font-size: 12px !important; font-weight: 560 !important;
+  color: #10151c !important; text-decoration: none !important;
+}
+.spread-offer-link:hover { background: #f7f8fa !important; }
+
+.spread-state { padding: 40px 0; text-align: center; }
+.spread-state-title { margin: 0 0 4px !important; font-size: 14px !important; font-weight: 600 !important; color: #10151c !important; }
+.spread-state-text { margin: 0 !important; font-size: 13px !important; color: #5b6672 !important; }
+
+.spread-spinner {
+  width: 26px; height: 26px; margin: 0 auto 14px;
+  border: 2.5px solid #e4e8ee; border-top-color: #0b6b3a; border-radius: 50%;
+  animation: spread-spin 720ms linear infinite;
+}
+@keyframes spread-spin { to { transform: rotate(360deg); } }
+
+.spread-footer { padding: 14px 0 2px; border-top: 1px solid #e4e8ee !important; }
+.spread-footer-text { font-size: 11px; color: #8a94a0 !important; }
+
+@media (prefers-color-scheme: dark) {
+  .spread-card { background: #171c22 !important; }
+  .spread-panel, .spread-logo, .spread-verdict-amount, .spread-offer-retailer,
+  .spread-offer-price, .spread-state-title { color: #eef2f6 !important; }
+  .spread-header, .spread-verdict, .spread-footer { border-color: #262c34 !important; }
+  .spread-offer { border-color: #20262d !important; }
+  .spread-offer-link { background: #1f252c !important; border-color: #333b45 !important; color: #eef2f6 !important; }
+  .spread-offer-link:hover { background: #262d35 !important; }
+  .spread-close:hover { background: #262c34 !important; color: #eef2f6 !important; }
+  .spread-verdict.is-saving .spread-verdict-amount, .spread-offer-delta.is-cheaper { color: #4ade80 !important; }
+  .spread-spinner { border-color: #262c34; border-top-color: #4ade80; }
+}
