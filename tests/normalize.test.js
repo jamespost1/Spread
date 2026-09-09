@@ -54,6 +54,21 @@ describe('extractModelNumbers', () => {
     expect(extractModelNumbers('')).toEqual([]);
     expect(extractModelNumbers(null)).toEqual([]);
   });
+
+  it('rejects a capacity, size or wattage as a model code', () => {
+    // "512GB" fits the generic alphanumeric pattern, but two different laptops
+    // that both mention 512GB are not the same product.
+    expect(extractModelNumbers('Dell XPS 9520 512GB 16GB RAM Laptop')).not.toContain('512GB');
+    expect(extractModelNumbers('Anker 20000mAh Power Bank')).toEqual([]);
+    expect(extractModelNumbers('Ninja 1000W Blender')).toEqual([]);
+    expect(extractModelNumbers('Sandisk 512GB Memory Card')).toEqual([]);
+    expect(extractModelNumbers('Gaming Monitor 144HZ')).toEqual([]);
+  });
+
+  it('still finds real model codes that end in letters', () => {
+    expect(extractModelNumbers('JBL Flip 520BT Speaker')).toContain('520BT');
+    expect(extractModelNumbers('LG OLED65C3PUA TV')).toContain('OLED65C3PUA');
+  });
 });
 
 describe('extractQuantities', () => {

@@ -128,6 +128,17 @@ describe('compareProducts — the precision invariant', () => {
     expect(r.signals.reason).toBe('condition-mismatch');
   });
 
+  it('does not treat a shared storage capacity as a shared model code', () => {
+    // Regression: "512GB" was being mined as a model code, which confirmed two
+    // entirely different laptops as the same product.
+    const r = compareProducts(
+      { title: 'Dell XPS 9520 512GB 16GB RAM Laptop', brand: 'Dell' },
+      { title: 'Dell Inspiron 3520 512GB Touchscreen', brand: 'Dell' }
+    );
+    expect(r.verdict).toBe(VERDICT.DIFFERENT);
+    expect(r.signals.reason).not.toBe('model-in-title');
+  });
+
   it('rejects a bundle against the standalone item', () => {
     const r = compareProducts(
       { title: 'Instant Pot Duo 6 Quart', brand: 'Instant Pot' },
