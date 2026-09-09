@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spread</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="head">
+      <span class="logo">Spread</span>
+      <span class="version" id="version"></span>
+    </header>
+
+    <section class="stats">
+      <div class="stat">
+        <span class="stat-value" id="savings">$0.00</span>
+        <span class="stat-label">Better prices found</span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-small">
+          <span class="stat-value-sm" id="comparisons">0</span>
+          <span class="stat-label-sm">Comparisons</span>
+        </div>
+        <div class="stat-small">
+          <span class="stat-value-sm" id="wins">0</span>
+          <span class="stat-label-sm">Cheaper elsewhere</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="status-panel">
+      <p class="status" id="status">Checking this page…</p>
+    </section>
+
+    <section class="panel">
+      <p class="hint">
+        Spread works on Amazon, Target, Walmart, Best Buy, eBay and Costco. Open any product page
+        and use the <strong>Compare price</strong> button next to the price.
+      </p>
+    </section>
+
+    <footer class="foot">
+      <a href="#" id="options-link">Settings</a>
+      <a href="https://github.com/jamespost1/super-shopper" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

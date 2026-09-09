@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #10151c;
+  --muted: #5b6672;
+  --line: #e4e8ee;
+  --accent: #0b6b3a;
+  --accent-soft: #eaf6ef;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d;
+    --fg: #eef2f6;
+    --muted: #9aa6b2;
+    --line: #262c34;
+    --accent: #4ade80;
+    --accent-soft: #16241c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 300px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.logo { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.version { font-size: 11px; color: var(--muted); }
+
+.stats { padding: 18px 16px 14px; text-align: center; }
+
+.stat-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.stat-row { display: flex; gap: 8px; margin-top: 16px; }
+.stat-small { flex: 1; padding: 10px 8px; background: var(--accent-soft); border-radius: 8px; }
+.stat-value-sm { display: block; font-size: 16px; font-weight: 620; font-variant-numeric: tabular-nums; }
+.stat-label-sm { font-size: 10px; color: var(--muted); }
+
+.panel { padding: 0 16px 12px; }
+
+.status {
+  margin: 0;
+  padding: 9px 11px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status.is-active { color: var(--accent); font-weight: 560; }
+
+.hint { margin: 0; font-size: 12px; color: var(--muted); }
+
+.foot {
+  display: flex;
+  gap: 14px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+}
+.foot a { color: var(--muted); font-size: 12px; text-decoration: none; }
+.foot a:hover { color: var(--fg); text-decoration: underline; }
