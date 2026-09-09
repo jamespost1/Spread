@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint src worker/src tests",
-    "zip": "npm run build && cd dist && zip -r ../spread-extension.zip . -x '*.DS_Store'"
+    "zip": "npm run build && cd dist && zip -r ../spread-extension.zip . -x '*.DS_Store'",
+    "eval": "node evals/run.mjs",
+    "eval:llm": "node evals/run.mjs --with-llm"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
