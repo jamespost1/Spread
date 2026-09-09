@@ -13,6 +13,12 @@ const BUTTON_CLASS = 'spread-trigger';
 let injectedFor = null;
 let lastUrl = location.href;
 
+/** URLs already reported, so a settling SPA does not observe the same page twice. */
+const observedUrls = new Set();
+
+/** Most recent history summary, handed to the panel when it opens. */
+let latestHistory = null;
+
 init();
 
 function init() {
@@ -80,6 +86,47 @@ function scan() {
 
   removeButton();
   injectButton(product);
+  observe(product);
+}
+
+/**
+ * Report this page's price so it joins the product's history, and use whatever
+ * comes back to say something useful on the button itself.
+ *
+ * Deliberately at most once per product per page: `scan` can fire several times
+ * as a single-page app settles, and this is a network call.
+ */
+function observe(product) {
+  if (observedUrls.has(product.url)) return;
+  observedUrls.add(product.url);
+
+  const { priceElement: _priceElement, ...payload } = product;
+
+  try {
+    chrome.runtime.sendMessage({ type: 'OBSERVE_PRODUCT', product: payload }, (response) => {
+      // A failed observation is not worth surfacing -- the user did not ask for
+      // it. Reading lastError marks it handled so Chrome stays quiet too.
+      void chrome.runtime.lastError;
+      if (response?.ok && response.history) {
+        latestHistory = response.history;
+        annotateButton(response.history);
+      }
+    });
+  } catch {
+    // The extension can be reloaded mid-page; nothing to do about it here.
+  }
+}
+
+/** Add a price-history signal to the button when there is one worth showing. */
+function annotateButton(history) {
+  const button = document.querySelector(`.${BUTTON_CLASS}`);
+  if (!button || !history) return;
+
+  if (history.isLowest && history.days >= 7) {
+    button.textContent = `Compare price · lowest in ${history.days}d`;
+  } else if (history.dropFromHighest > 0) {
+    button.textContent = 'Compare price · price history';
+  }
 }
 
 function injectButton(product) {
@@ -96,7 +143,7 @@ function injectButton(product) {
     event.preventDefault();
     event.stopPropagation();
     // Re-read the page at click time: prices update in place on every retailer.
-    openPanel(extractProduct() || product, requestComparison);
+    openPanel(extractProduct() || product, requestComparison, latestHistory);
   });
 
   (anchor.parentElement || anchor).insertAdjacentElement('afterend', button);
