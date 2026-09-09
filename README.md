@@ -2,7 +2,7 @@
 
 **See what the product you're looking at actually costs everywhere else.**
 
-[![CI](https://github.com/jamespost1/super-shopper/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/super-shopper/actions/workflows/ci.yml)
+[![CI](https://github.com/jamespost1/spread/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/spread/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-140%20passing-0b6b3a)](tests/)
 [![Match precision](https://img.shields.io/badge/match%20precision-100%25-0b6b3a)](evals/)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
