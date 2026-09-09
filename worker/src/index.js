@@ -11,12 +11,14 @@
 //   5. Cache and return.
 
 import { partitionCandidates, VERDICT } from '../../src/core/matching.js';
+import { productKey, keyStrength } from '../../src/core/product-key.js';
 import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
 import { adjudicate } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
 import { handleChallenge, handleNotification } from './ebay-compliance.js';
+import { recordObservation, observedOffers } from './history.js';
 
 /** Per-install request ceiling, per hour. Blunt, but enough to stop a runaway loop. */
 const RATE_LIMIT_PER_HOUR = 120;
@@ -33,6 +35,9 @@ export default {
       }
       if (url.pathname === '/v1/compare' && request.method === 'POST') {
         return corsResponse(env, await handleCompare(request, env, ctx));
+      }
+      if (url.pathname === '/v1/observe' && request.method === 'POST') {
+        return corsResponse(env, await handleObserve(request, env));
       }
 
       // eBay calls this directly, not the extension, so it is deliberately
@@ -92,19 +97,38 @@ async function handleCompare(request, env, ctx) {
   // --- Stage 2: LLM, only for what Stage 1 could not decide ----------------
   const { candidates: judged, stats } = await adjudicate(product, ambiguous, env);
 
-  const offers = [...resolved, ...judged]
+  // --- Prices observed on other retailers' pages by real traffic ------------
+  // These skip the matcher entirely: they were filed under this product's key,
+  // and that key *is* the identity claim. Which is why only a strong key
+  // qualifies -- a title-derived key is good enough to track one retailer over
+  // time, but not to assert that two retailers are selling the same thing.
+  const key = productKey(product);
+  const observed =
+    key && keyStrength(key) === 'strong'
+      ? (await observedOffers(env.SPREAD_KV, key, product.retailer)).map((offer) => ({
+          ...offer,
+          title: product.title,
+          match: { verdict: VERDICT.SAME, stage: 'observed', score: 1 },
+        }))
+      : [];
+
+  const offers = [...resolved, ...judged, ...observed]
     .filter((c) => c.match?.verdict === VERDICT.SAME || c.match?.verdict === VERDICT.SIMILAR)
-    .filter((c) => c.url && Number.isFinite(c.price))
+    .filter((c) => Number.isFinite(c.price))
+    // An observed price has no link -- it was seen on a page we did not record.
+    // It is still worth showing, so only API-sourced offers require a URL.
+    .filter((c) => c.url || c.source === 'observed')
     .sort(byRelevanceThenPrice)
     .slice(0, 12);
 
   const payload = {
-    offers,
-    sources,
+    offers: dedupeByRetailer(offers),
+    sources: { ...sources, observed: { ok: true, count: observed.length } },
     matching: {
       candidates: candidates.length,
       resolvedByHeuristics: resolved.length,
       sentToAdjudicator: ambiguous.length,
+      fromObservations: observed.length,
       ...stats,
     },
     generatedAt: new Date().toISOString(),
@@ -115,11 +139,71 @@ async function handleCompare(request, env, ctx) {
   return json({ ...payload, cached: false });
 }
 
+/**
+ * Record the price on a page the user opened, and hand back what we know about
+ * that product's price over time.
+ *
+ * Called on product page views, so it is the hottest path in the service. It
+ * does one KV read, and a write only when the observation actually says
+ * something new.
+ */
+async function handleObserve(request, env) {
+  const body = await request.json().catch(() => null);
+  const product = body?.product;
+
+  if (!product?.title || !Number.isFinite(product.price) || !product.retailer) {
+    return json({ error: 'invalid_product' }, 400);
+  }
+
+  const installId = String(body.installId || '').slice(0, 64);
+  if (installId && !(await withinRateLimit(env, installId))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  const key = productKey(product);
+  if (!key) {
+    // Identity could not be established confidently. Recording anyway would
+    // risk merging different products into one price history.
+    return json({ recorded: false, reason: 'no_stable_key' });
+  }
+
+  const { summary, wrote } = await recordObservation(env.SPREAD_KV, key, {
+    retailer: product.retailer,
+    price: product.price,
+  });
+
+  return json({ recorded: wrote, history: summary });
+}
+
+/**
+ * One offer per retailer. Offers arrive already ranked, so the first occurrence
+ * of a retailer is its best -- which also means a live API price naturally wins
+ * over an observed snapshot for the same store.
+ */
+function dedupeByRetailer(offers) {
+  const seen = new Set();
+  const kept = [];
+  for (const offer of offers) {
+    const retailer = offer.retailer || 'unknown';
+    if (seen.has(retailer)) continue;
+    seen.add(retailer);
+    kept.push(offer);
+  }
+  return kept;
+}
+
 /** Same-product offers first, then cheapest. */
 function byRelevanceThenPrice(a, b) {
   const rank = (c) => (c.match?.verdict === VERDICT.SAME ? 0 : 1);
   const byRank = rank(a) - rank(b);
-  return byRank !== 0 ? byRank : a.price - b.price;
+  if (byRank !== 0) return byRank;
+
+  // Prefer an offer the shopper can actually click through to.
+  const linkable = (c) => (c.url ? 0 : 1);
+  const byLink = linkable(a) - linkable(b);
+  if (byLink !== 0) return byLink;
+
+  return a.price - b.price;
 }
 
 async function health(env) {
