@@ -3,7 +3,7 @@
 **See what the product you're looking at actually costs everywhere else.**
 
 [![CI](https://github.com/jamespost1/super-shopper/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/super-shopper/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-100%20passing-0b6b3a)](tests/)
+[![Tests](https://img.shields.io/badge/tests-140%20passing-0b6b3a)](tests/)
 [![Match precision](https://img.shields.io/badge/match%20precision-100%25-0b6b3a)](evals/)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -88,6 +88,41 @@ Measured by [`evals/run.mjs`](evals/run.mjs) over a [labeled set](evals/fixtures
 of deliberately hard pairs — adjacent model generations, capacity variants, bundles, refurbished
 units, and correct matches buried in marketplace keyword spam. CI fails if precision drops below 90%.
 
+## Price history, and why it carries the product
+
+The free retailer APIs cover a narrow slice of the catalog -- Best Buy is
+electronics, and Amazon and Target publish no open product API at all. So on most
+product pages, a pure comparison tool has nothing to say. An extension that
+usually returns "no matches found" does not survive on anyone's toolbar.
+
+Spread therefore records the price on every supported product page it opens.
+That gives it something useful on every page, independent of any API:
+
+> **$328.00** now · **$328.00** lowest seen · **$399.99** highest seen
+> This is the lowest price in 84 days.
+
+The same records accumulate into cross-retailer coverage that grows with usage
+rather than being capped by which APIs will have us -- when one person views a
+product on Best Buy and another views it on Amazon, that is a real observed price
+pair. This is where the product key in [`src/core/product-key.js`](src/core/product-key.js)
+earns its keep, and why it is deliberately conservative: it must derive matching
+identities from two listings *independently*, with no pair to compare, and a
+collision would merge two products into one history and show a price that was
+never real. When identity cannot be established confidently, nothing is recorded.
+
+Only a model-derived key is trusted to join prices across retailers. A
+title-derived key tracks one retailer over time but is never used to claim two
+stores are selling the same thing.
+
+**What is stored is a fact about a product**, not about a person: retailer, price,
+timestamp. No identifier is attached, so the stored data cannot be turned back
+into who viewed what. The install ID exists solely to rate-limit the free service
+and is never written next to an observation.
+
+Write volume is the real constraint, since KV writes are the scarce resource on
+Cloudflare's free tier. An unchanged price is read, recognised as redundant, and
+dropped without a write, so cost tracks price *changes* rather than page views.
+
 ---
 
 ## What it costs to run
@@ -122,6 +157,7 @@ src/
 │   ├── normalize.js         Model-code and pack-size extraction from titles
 │   ├── similarity.js        Levenshtein · Jaccard · containment
 │   ├── price.js             Strict USD parsing, deltas, best-saving
+│   ├── product-key.js       Cross-retailer identity from a single listing
 │   └── retailers.js         Retailer identity and URL safety
 ├── content/                 Runs on retailer pages
 │   ├── index.js             SPA-aware injection
@@ -134,6 +170,7 @@ worker/                      Cloudflare Worker — holds every credential
 ├── src/index.js             Router, fan-out, ranking
 ├── src/adjudicator.js       Stage 2: Claude, batched + budget-gated
 ├── src/adapters/            Best Buy and eBay clients
+├── src/history.js           Price observations, summaries, observed offers
 └── src/{budget,cache}.js    Spend cap and two-tier KV caching
 ```
 
@@ -149,7 +186,7 @@ every URL is scheme-validated before it reaches an `href`.
 
 ```bash
 npm install
-npm test           # 100 unit tests
+npm test           # 140 unit tests
 npm run coverage   # enforces 85% on src/core
 npm run eval       # measures the matcher, no credentials needed
 npm run build      # produces a loadable extension in dist/
@@ -205,7 +242,8 @@ deploys the Worker. See [docs/PUBLISHING.md](docs/PUBLISHING.md) for the one-tim
 
 **Reads prices from:** Amazon · Target · Walmart · Best Buy · eBay · Costco
 
-**Compares against:** Best Buy · eBay
+**Compares against:** Best Buy · eBay, plus any supported retailer whose price has
+been observed on a page recently
 
 Amazon and Target have no openly available product API — Amazon's requires an Associates account
 with qualifying sales — so they work as *source* pages, read client-side from the page you are
