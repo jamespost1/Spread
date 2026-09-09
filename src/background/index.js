@@ -26,6 +26,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true; // Keep the channel open for the async reply.
   }
 
+  if (message?.type === 'OBSERVE_PRODUCT') {
+    observeProduct(message.product)
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
   if (message?.type === 'GET_STATS') {
     chrome.storage.local.get(['stats']).then(({ stats }) => sendResponse(stats || emptyStats()));
     return true;
@@ -66,6 +73,43 @@ async function compareProduct(product) {
       return { ok: false, error: 'The comparison timed out. Try again in a moment.' };
     }
     return { ok: false, error: 'Could not reach the Spread service.' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Report the price on a page the user opened, and get back that product's price
+ * history.
+ *
+ * Runs on product page views rather than on click, so it is deliberately quiet:
+ * a short timeout, and every failure resolves rather than rejects. Nothing about
+ * this call should ever be visible to someone who is just browsing.
+ *
+ * @param {object} product
+ * @returns {Promise<{ok: boolean, history?: object}>}
+ */
+async function observeProduct(product) {
+  const { apiBase, installId } = await chrome.storage.local.get(['apiBase', 'installId']);
+  const endpoint = `${(apiBase || DEFAULT_API_BASE).replace(/\/+$/, '')}/v1/observe`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product, installId }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return { ok: false };
+
+    const data = await response.json();
+    return { ok: true, history: data.history || null };
+  } catch {
+    return { ok: false };
   } finally {
     clearTimeout(timeout);
   }

@@ -17,7 +17,7 @@ let lastFocused = null;
  * @param {object} product
  * @param {(product: object) => Promise<object>} fetchComparison
  */
-export function openPanel(product, fetchComparison) {
+export function openPanel(product, fetchComparison, history = null) {
   closePanel();
   lastFocused = document.activeElement;
 
@@ -31,8 +31,8 @@ export function openPanel(product, fetchComparison) {
   fetchComparison(product)
     .then((response) => {
       if (activePanel !== overlay) return; // Closed while in flight.
-      if (response?.ok) renderResults(body, product, response);
-      else renderError(body, response?.error);
+      if (response?.ok) renderResults(body, product, response, history);
+      else renderError(body, response?.error, history);
     })
     .catch(() => {
       if (activePanel === overlay) renderError(body);
@@ -96,8 +96,13 @@ function renderLoading(body) {
   body.appendChild(wrap);
 }
 
-function renderError(body, message) {
+function renderError(body, message, history = null) {
   body.replaceChildren();
+
+  // Price history is local to this product and does not depend on the
+  // comparison succeeding, so show it even when the lookup failed.
+  if (history) body.appendChild(buildHistory(history));
+
   const wrap = el('div', 'spread-state');
   wrap.appendChild(el('p', 'spread-state-title', 'Could not compare right now'));
   wrap.appendChild(
@@ -106,7 +111,7 @@ function renderError(body, message) {
   body.appendChild(wrap);
 }
 
-function renderResults(body, product, response) {
+function renderResults(body, product, response, history = null) {
   body.replaceChildren();
 
   const offers = response.offers || [];
@@ -114,6 +119,11 @@ function renderResults(body, product, response) {
   const similar = offers.filter((o) => o.match?.verdict === 'similar');
 
   body.appendChild(buildVerdict(product, same));
+
+  const historySummary = response.history || history;
+  if (historySummary && historySummary.points > 1) {
+    body.appendChild(buildHistory(historySummary));
+  }
 
   if (same.length > 0) {
     body.appendChild(buildSection('Same product', buildOfferTable(product, same)));
@@ -166,6 +176,57 @@ function buildVerdict(product, sameOffers) {
   return wrap;
 }
 
+/**
+ * Price history for the retailer whose page this is.
+ *
+ * Only this retailer's own series is shown -- mixing retailers into one line
+ * would make "lowest" meaningless, since a cheaper store would permanently own
+ * the low point.
+ */
+function buildHistory(history) {
+  const section = el('section', 'spread-section spread-history');
+  section.appendChild(
+    el('h3', 'spread-section-title', `Price at ${history.retailer} over ${history.days} days`)
+  );
+
+  const row = el('div', 'spread-history-row');
+  row.appendChild(statBlock('Now', formatPrice(history.current), history.isLowest));
+  if (Number.isFinite(history.lowest)) {
+    row.appendChild(statBlock('Lowest seen', formatPrice(history.lowest)));
+  }
+  if (Number.isFinite(history.highest) && history.highest !== history.lowest) {
+    row.appendChild(statBlock('Highest seen', formatPrice(history.highest)));
+  }
+  section.appendChild(row);
+
+  if (history.isLowest) {
+    section.appendChild(
+      el('p', 'spread-history-note is-good', `This is the lowest price in ${history.days} days.`)
+    );
+  } else if (Number.isFinite(history.lowest) && history.current > history.lowest) {
+    const above = formatPrice(Math.round((history.current - history.lowest) * 100) / 100);
+    section.appendChild(
+      el('p', 'spread-history-note', `${above} above the lowest price seen in ${history.days} days.`)
+    );
+  }
+
+  section.appendChild(
+    el(
+      'p',
+      'spread-history-meta',
+      `From ${history.points} observation${history.points === 1 ? '' : 's'}.`
+    )
+  );
+  return section;
+}
+
+function statBlock(label, value, highlight = false) {
+  const block = el('div', `spread-stat${highlight ? ' is-good' : ''}`);
+  block.appendChild(el('span', 'spread-stat-value', value));
+  block.appendChild(el('span', 'spread-stat-label', label));
+  return block;
+}
+
 function buildSection(title, content) {
   const section = el('section', 'spread-section');
   section.appendChild(el('h3', 'spread-section-title', title));
@@ -186,6 +247,10 @@ function buildOfferTable(product, offers) {
       main.appendChild(
         el('span', 'spread-offer-note', `includes ${formatPrice(offer.shipping)} shipping`)
       );
+    }
+    if (offer.source === 'observed' && Number.isFinite(offer.observedAt)) {
+      // Not a live quote -- be explicit rather than let it read as current.
+      main.appendChild(el('span', 'spread-offer-note', `last seen ${relativeTime(offer.observedAt)}`));
     }
 
     const right = el('div', 'spread-offer-right');
@@ -230,6 +295,15 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
+}
+
+/** Coarse relative time -- precision here would imply more than we know. */
+function relativeTime(timestamp) {
+  const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 function truncate(text, max) {

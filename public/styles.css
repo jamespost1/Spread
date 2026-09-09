@@ -124,3 +124,31 @@
   .spread-verdict.is-saving .spread-verdict-amount, .spread-offer-delta.is-cheaper { color: #4ade80 !important; }
   .spread-spinner { border-color: #262c34; border-top-color: #4ade80; }
 }
+
+/* Price history */
+.spread-history-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.spread-stat {
+  flex: 1; padding: 10px 12px; border-radius: 9px;
+  background: #f2f4f7 !important; text-align: center;
+}
+.spread-stat.is-good { background: #eaf6ef !important; }
+.spread-stat-value {
+  display: block; font-size: 16px; font-weight: 620;
+  font-variant-numeric: tabular-nums; color: #10151c !important;
+}
+.spread-stat.is-good .spread-stat-value { color: #0b6b3a !important; }
+.spread-stat-label {
+  display: block; margin-top: 1px; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.05em; color: #5b6672 !important;
+}
+.spread-history-note { margin: 0 !important; font-size: 12px !important; color: #5b6672 !important; }
+.spread-history-note.is-good { color: #0b6b3a !important; font-weight: 560; }
+.spread-history-meta { margin: 4px 0 0 !important; font-size: 11px !important; color: #8a94a0 !important; }
+
+@media (prefers-color-scheme: dark) {
+  .spread-stat { background: #1f252c !important; }
+  .spread-stat.is-good { background: #16241c !important; }
+  .spread-stat-value { color: #eef2f6 !important; }
+  .spread-stat.is-good .spread-stat-value,
+  .spread-history-note.is-good { color: #4ade80 !important; }
+}
