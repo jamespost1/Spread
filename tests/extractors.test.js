@@ -1,0 +1,172 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, beforeEach } from 'vitest';
+import { extractProduct, isProductPage } from '../src/content/extractors/index.js';
+
+/** Build a fake page: JSON-LD payload plus arbitrary body markup. */
+function page({ jsonLd, body = '', canonical } = {}) {
+  document.head.innerHTML = canonical ? `<link rel="canonical" href="${canonical}">` : '';
+  document.body.innerHTML =
+    (jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : '') + body;
+  return document;
+}
+
+const amazonLoc = {
+  hostname: 'www.amazon.com',
+  href: 'https://www.amazon.com/dp/B09XS7JWHH?ref=tracking',
+};
+
+describe('isProductPage', () => {
+  it('accepts an Amazon product URL', () => {
+    expect(isProductPage(document, amazonLoc)).toBe(true);
+  });
+
+  it('rejects an Amazon search page', () => {
+    expect(
+      isProductPage(document, { hostname: 'www.amazon.com', href: 'https://www.amazon.com/s?k=tv' })
+    ).toBe(false);
+  });
+
+  it('rejects an unsupported retailer', () => {
+    expect(
+      isProductPage(document, { hostname: 'www.newegg.com', href: 'https://www.newegg.com/p/1' })
+    ).toBe(false);
+  });
+});
+
+describe('extractProduct — structured data', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('reads a schema.org Product', () => {
+    page({
+      jsonLd: {
+        '@type': 'Product',
+        name: 'Sony WH-1000XM5 Headphones',
+        brand: { '@type': 'Brand', name: 'Sony' },
+        model: 'WH1000XM5',
+        sku: 'B09XS7JWHH',
+        image: 'https://img.example/xm5.jpg',
+        offers: { '@type': 'Offer', price: '349.99', priceCurrency: 'USD' },
+      },
+    });
+
+    const product = extractProduct(document, amazonLoc);
+    expect(product).toMatchObject({
+      retailer: 'Amazon',
+      title: 'Sony WH-1000XM5 Headphones',
+      price: 349.99,
+      brand: 'Sony',
+      model: 'WH1000XM5',
+      sku: 'B09XS7JWHH',
+      imageUrl: 'https://img.example/xm5.jpg',
+    });
+  });
+
+  it('finds a Product nested inside an @graph', () => {
+    page({
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@graph': [
+          { '@type': 'BreadcrumbList' },
+          { '@type': ['Product'], name: 'Graph Product', offers: { price: 19.99 } },
+        ],
+      },
+    });
+    expect(extractProduct(document, amazonLoc)?.title).toBe('Graph Product');
+  });
+
+  it('reads an AggregateOffer lowPrice', () => {
+    page({
+      jsonLd: {
+        '@type': 'Product',
+        name: 'Ranged Product',
+        offers: { '@type': 'AggregateOffer', lowPrice: '99.00', priceCurrency: 'USD' },
+      },
+    });
+    expect(extractProduct(document, amazonLoc)?.price).toBe(99);
+  });
+
+  it('ignores a non-USD structured price', () => {
+    page({
+      jsonLd: {
+        '@type': 'Product',
+        name: 'Euro Product',
+        offers: { price: '349.99', priceCurrency: 'EUR' },
+      },
+    });
+    expect(extractProduct(document, amazonLoc)).toBeNull();
+  });
+
+  it('survives malformed JSON-LD', () => {
+    document.body.innerHTML =
+      '<script type="application/ld+json">{ not json </script>' +
+      '<span id="productTitle">Fallback Title</span><div class="a-price"><span class="a-offscreen">$12.00</span></div>';
+    const product = extractProduct(document, amazonLoc);
+    expect(product?.title).toBe('Fallback Title');
+  });
+});
+
+describe('extractProduct — selector fallback', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('falls back to CSS selectors when no structured data exists', () => {
+    page({
+      body: `
+        <span id="productTitle">  Instant Pot Duo 7-in-1  </span>
+        <div class="a-price"><span class="a-offscreen">$89.99</span></div>
+        <img id="landingImage" src="https://img.example/pot.jpg">
+        <span id="brand">Instant Pot</span>`,
+    });
+
+    const product = extractProduct(document, amazonLoc);
+    expect(product).toMatchObject({
+      title: 'Instant Pot Duo 7-in-1',
+      price: 89.99,
+      brand: 'Instant Pot',
+      imageUrl: 'https://img.example/pot.jpg',
+    });
+  });
+
+  it('exposes the price element so the button can be anchored to it', () => {
+    page({ body: '<span id="productTitle">X</span><div class="a-price"><span class="a-offscreen">$5.00</span></div>' });
+    expect(extractProduct(document, amazonLoc)?.priceElement).toBeTruthy();
+  });
+
+  it('returns null when no price can be read', () => {
+    page({ body: '<span id="productTitle">Priceless</span>' });
+    expect(extractProduct(document, amazonLoc)).toBeNull();
+  });
+
+  it('returns null when no title can be read', () => {
+    page({ body: '<div class="a-price"><span class="a-offscreen">$5.00</span></div>' });
+    expect(extractProduct(document, amazonLoc)).toBeNull();
+  });
+
+  it('prefers the canonical URL over one carrying tracking parameters', () => {
+    page({
+      canonical: 'https://www.amazon.com/dp/B09XS7JWHH',
+      body: '<span id="productTitle">T</span><div class="a-price"><span class="a-offscreen">$1.00</span></div>',
+    });
+    expect(extractProduct(document, amazonLoc)?.url).toBe('https://www.amazon.com/dp/B09XS7JWHH');
+  });
+});
+
+describe('extractProduct — retailer routing', () => {
+  it('returns null off a supported retailer', () => {
+    expect(extractProduct(document, { hostname: 'example.com', href: 'https://example.com' })).toBeNull();
+  });
+
+  it('reads a Best Buy page with its own selectors', () => {
+    page({ body: '<div class="sku-title"><h1>Dyson V15</h1></div><div data-testid="customer-price">$749.99</div>' });
+    const product = extractProduct(document, {
+      hostname: 'www.bestbuy.com',
+      href: 'https://www.bestbuy.com/site/dyson-v15/6501234.p',
+    });
+    expect(product).toMatchObject({ retailer: 'Best Buy', title: 'Dyson V15', price: 749.99 });
+  });
+});

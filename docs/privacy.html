@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spread — Privacy Policy</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --fg:#10151c; --muted:#5b6672; --line:#e4e8ee; --accent:#0b6b3a; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#0f1216; --fg:#eef2f6; --muted:#9aa6b2; --line:#262c34; --accent:#4ade80; }
+      }
+      body { margin:0; background:var(--bg); color:var(--fg);
+             font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+      main { max-width:680px; margin:0 auto; padding:56px 24px 80px; }
+      h1 { font-size:30px; letter-spacing:-0.02em; margin:0 0 6px; }
+      .updated { color:var(--muted); font-size:14px; margin:0 0 36px; }
+      h2 { font-size:18px; margin:36px 0 10px; }
+      p, li { color:var(--fg); }
+      .lede { font-size:17px; }
+      ul { padding-left:20px; }
+      li { margin-bottom:7px; }
+      table { width:100%; border-collapse:collapse; margin:16px 0; font-size:15px; }
+      th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+      th { font-weight:600; }
+      .box { border:1px solid var(--line); border-left:3px solid var(--accent);
+             border-radius:8px; padding:16px 18px; margin:22px 0; }
+      a { color:var(--accent); }
+      footer { margin-top:48px; padding-top:20px; border-top:1px solid var(--line);
+               color:var(--muted); font-size:14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Spread browser extension · Last updated 9 September 2026</p>
+
+      <p class="lede">
+        Spread has no accounts, no analytics, no advertising, and no tracking. It does not build a
+        profile of you, and it does not watch your browsing.
+      </p>
+
+      <div class="box">
+        <strong>The short version.</strong> On product pages at the six supported retailers, Spread
+        sends that product's title and price to its own service so it can build a price history and
+        find prices elsewhere. What gets stored is a fact about the <em>product</em> — "this cost $328
+        at Best Buy at this time" — with no record of who saw it. Nothing you view anywhere else is
+        ever sent.
+      </div>
+
+      <h2>What Spread sends, and when</h2>
+      <p>Spread transmits data at two moments, and no others.</p>
+
+      <p>
+        <strong>1. When you open a product page</strong> at one of the six supported retailers, Spread
+        sends that product's details so its price joins the product's price history. This is what lets
+        Spread tell you "this is the lowest price in 60 days" — a claim that is impossible without
+        having recorded the earlier prices.
+      </p>
+      <p>
+        <strong>2. When you click Compare price</strong>, Spread sends the same details again to look
+        up what other retailers charge.
+      </p>
+      <p>
+        Nothing is sent for any other page. Non-product pages on those six sites send nothing, and
+        every other website you visit is invisible to Spread — the extension cannot run there at all.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Product title</td><td>To identify the product and find it at other retailers</td></tr>
+          <tr><td>Price, brand, model number</td><td>To record the price and confirm a match</td></tr>
+          <tr><td>Retailer name</td><td>To attribute the price and exclude the site you are on</td></tr>
+          <tr>
+            <td>A random install ID</td>
+            <td>
+              Used only to rate-limit abuse of the free service. It is a random value generated at
+              install, not derived from anything about you or your device. It is checked against a
+              short-lived counter and <strong>is never stored alongside a price observation</strong> —
+              recorded prices carry no identifier of any kind.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>How price history works</h2>
+      <p>
+        A recorded observation is three values: the retailer, the price, and the time. It is filed
+        under the product, not under a person, and it is indistinguishable from an observation made by
+        anyone else. There is no way to reconstruct from the stored data which products a given
+        person looked at, because the link is never written down.
+      </p>
+      <p>
+        Spread also declines to record anything it cannot identify confidently. If a product's brand
+        and model cannot be established from the page, no observation is stored at all — merging two
+        different products into one price history would produce prices that were never real.
+      </p>
+
+      <h2>What Spread never collects</h2>
+      <ul>
+        <li>Your name, email address, or any account information — there are no accounts.</li>
+        <li>Your browsing history. Spread runs only on product pages at six retailers and can see
+            nothing else; what it records there is filed under the product, never under you.</li>
+        <li>Cookies, login state, form contents, payment details, or anything in your cart.</li>
+        <li>Your IP address in any stored form. It is visible to the server in transit, as with any
+            web request, and is not logged or retained.</li>
+        <li>Advertising or cross-site tracking identifiers. Spread sets none and reads none.</li>
+      </ul>
+
+      <h2>Where your data goes</h2>
+      <p>
+        Product details are sent to the Spread comparison service, which runs on Cloudflare Workers.
+        That service queries retailer product APIs (Best Buy and eBay) to find matching listings.
+        In cases where matching is genuinely ambiguous, two product <em>titles</em> — and nothing
+        else — may be sent to Anthropic's Claude API to confirm whether they describe the same item.
+      </p>
+      <p>
+        Spread does not sell, rent, or share data with anyone else, and it has no advertising
+        partners.
+      </p>
+
+      <h2>What is stored, and for how long</h2>
+      <ul>
+        <li>
+          <strong>On your device:</strong> a count of comparisons made and the total price
+          differences found, so the toolbar popup can show your savings. This never leaves your
+          browser. You can erase it any time from Spread's settings page.
+        </li>
+        <li>
+          <strong>On the server:</strong> price observations are kept for up to a year, keyed by
+          product and carrying no identifier. Comparison results are cached for 6 hours and
+          product-match results for 90 days, both keyed by product. Rate-limit counters expire
+          within 2 hours.
+        </li>
+      </ul>
+
+      <h2>Permissions, and why each is needed</h2>
+      <ul>
+        <li><strong>storage</strong> — saves your local savings total and settings on your device.</li>
+        <li><strong>activeTab</strong> — lets the toolbar popup tell you whether Spread works on the
+            page you are looking at.</li>
+        <li><strong>Access to six retailer sites</strong> — Amazon, Target, Walmart, Best Buy, eBay
+            and Costco. Spread reads the product title and price on those pages and cannot run
+            anywhere else.</li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>Spread is not directed at children under 13 and collects no personal information from anyone.</p>
+
+      <h2>Changes</h2>
+      <p>
+        Material changes to this policy will be reflected in a new extension version and in the
+        date above. The full history is public in the
+        <a href="https://github.com/jamespost1/Spread">source repository</a>.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests: open an issue on
+        <a href="https://github.com/jamespost1/Spread/issues">GitHub</a>.
+      </p>
+
+      <footer>
+        Spread is open source. Everything described here can be verified by reading the code.
+      </footer>
+    </main>
+  </body>
+</html>

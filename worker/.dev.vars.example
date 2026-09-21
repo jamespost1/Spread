@@ -1,0 +1,5 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit the real file.
+BESTBUY_API_KEY=
+EBAY_CLIENT_ID=
+EBAY_CLIENT_SECRET=
+ANTHROPIC_API_KEY=

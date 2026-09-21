@@ -1,0 +1,30 @@
+{
+  "name": "spread",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that shows the real price spread for a product across retailers.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint src worker/src tests",
+    "zip": "npm run build && cd dist && zip -r ../spread-extension.zip . -x '*.DS_Store'",
+    "eval": "node evals/run.mjs",
+    "eval:llm": "node evals/run.mjs --with-llm"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.17.0",
+    "happy-dom": "^20.14.0",
+    "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true,
+    "esbuild@0.21.5": true
+  }
+}

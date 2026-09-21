@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spread — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Spread</h1>
+        <p class="lede">Real prices across retailers. No account, no setup.</p>
+      </header>
+
+      <section class="card" id="welcome" hidden>
+        <h2>You're all set</h2>
+        <p>
+          Open a product page on Amazon, Target, Walmart, Best Buy, eBay or Costco and look for the
+          <strong>Compare price</strong> button next to the price. There is nothing to configure.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Your data</h2>
+        <p>
+          On product pages at the six supported retailers, Spread sends that product's
+          <strong>title, price, brand and model</strong> to its service — once when the page opens, so
+          the price joins that product's history, and again if you click Compare price.
+        </p>
+        <p>
+          Recorded prices are filed under the product and carry <strong>no identifier</strong>, so
+          there is no record of who saw what. Spread has no account system and cannot run on any site
+          other than those six.
+        </p>
+        <p>
+          Your savings totals are stored on this device only. Clear them any time.
+        </p>
+        <button id="clear-stats" class="btn-secondary" type="button">Clear saved stats</button>
+        <p class="status" id="stats-status" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Advanced</h2>
+        <label for="api-base">Comparison service endpoint</label>
+        <input id="api-base" type="url" spellcheck="false" placeholder="https://spread-api.workers.dev" />
+        <p class="hint">
+          Only change this if you are running your own Spread Worker. Leave it blank for the default.
+        </p>
+        <button id="save" class="btn" type="button">Save</button>
+        <p class="status" id="save-status" role="status"></p>
+      </section>
+
+      <footer>
+        <a href="https://github.com/jamespost1/Spread" target="_blank" rel="noopener">Source</a>
+        <a href="https://jamespost1.github.io/Spread/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
+      </footer>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
