@@ -8,7 +8,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://spread-api.workers.dev/*"
+    "https://spread-api.jamesbpost.workers.dev/*"
   ],
   "background": {
     "service_worker": "background.js",
