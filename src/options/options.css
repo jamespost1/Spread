@@ -1,0 +1,35 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f8fa; --card: #ffffff; --fg: #10151c; --muted: #5b6672;
+  --line: #e4e8ee; --accent: #0b6b3a; --error: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1216; --card: #171c22; --fg: #eef2f6; --muted: #9aa6b2;
+          --line: #262c34; --accent: #4ade80; --error: #f97066; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+       font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 620px; margin: 0 auto; padding: 40px 24px 64px; }
+h1 { margin: 0; font-size: 24px; font-weight: 660; letter-spacing: -0.02em; }
+.lede { margin: 4px 0 28px; color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+        padding: 20px 22px; margin-bottom: 18px; }
+.card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 620; }
+.card p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+label { display: block; font-size: 13px; font-weight: 560; margin-bottom: 6px; }
+input[type="url"] { width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+                    border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 13px; }
+input[type="url"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.hint { font-size: 12px; margin: 8px 0 14px; }
+.btn, .btn-secondary { border-radius: 8px; padding: 8px 16px; font-size: 13px;
+                       font-weight: 560; cursor: pointer; border: 1px solid transparent; }
+.btn { background: var(--accent); color: #fff; }
+.btn-secondary { background: transparent; color: var(--fg); border-color: var(--line); }
+.btn:hover, .btn-secondary:hover { filter: brightness(1.08); }
+.status { min-height: 18px; margin: 10px 0 0; font-size: 12px; }
+.status.is-ok { color: var(--accent); }
+.status.is-error { color: var(--error); }
+footer { display: flex; gap: 16px; padding-top: 8px; }
+footer a { color: var(--muted); font-size: 13px; text-decoration: none; }
+footer a:hover { color: var(--fg); text-decoration: underline; }

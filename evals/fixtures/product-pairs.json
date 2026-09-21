@@ -1,0 +1,326 @@
+{
+  "description": "Labeled product pairs for measuring the match cascade. `label` is ground truth: same = a shopper buying either listing receives the same physical item.",
+  "pairs": [
+    {
+      "id": "xm5-reworded",
+      "note": "Same product, completely different title wording.",
+      "source": {
+        "title": "Sony WH-1000XM5 Wireless Noise Canceling Headphones",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Sony WH1000XM5 Over-Ear Bluetooth Headphone, Black",
+        "brand": "Sony",
+        "price": 328.0
+      },
+      "label": "same"
+    },
+    {
+      "id": "xm5-vs-xm4",
+      "note": "THE trap: adjacent generations are ~96% similar as strings.",
+      "source": {
+        "title": "Sony WH-1000XM5 Headphones",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Sony WH-1000XM4 Headphones",
+        "brand": "Sony",
+        "price": 279.0
+      },
+      "label": "different"
+    },
+    {
+      "id": "xm5-colour-variant",
+      "note": "Colour suffix on the model code does not change the product.",
+      "source": {
+        "title": "Sony WH-1000XM5 Headphones Silver",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Sony WH1000XM5B Headphones Black",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "label": "same"
+    },
+    {
+      "id": "different-brand",
+      "source": {
+        "title": "Sony WH-1000XM5 Noise Cancelling Headphones",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Bose QuietComfort 45 Noise Cancelling Headphones",
+        "brand": "Bose",
+        "price": 279.0
+      },
+      "label": "different"
+    },
+    {
+      "id": "airpods-gen",
+      "source": {
+        "title": "Apple AirPods Pro (2nd Generation) with MagSafe Case USB-C",
+        "brand": "Apple",
+        "price": 249.0
+      },
+      "candidate": {
+        "title": "Apple AirPods Pro 2nd Gen USB-C Wireless Earbuds",
+        "brand": "Apple",
+        "price": 189.99
+      },
+      "label": "same"
+    },
+    {
+      "id": "airpods-cross-gen",
+      "source": {
+        "title": "Apple AirPods Pro (2nd Generation)",
+        "brand": "Apple",
+        "price": 249.0
+      },
+      "candidate": {
+        "title": "Apple AirPods Pro (1st Generation)",
+        "brand": "Apple",
+        "price": 169.0
+      },
+      "label": "different"
+    },
+    {
+      "id": "capacity-differs",
+      "note": "Same model line, different storage tier.",
+      "source": {
+        "title": "Samsung 990 PRO 2TB NVMe M.2 SSD",
+        "brand": "Samsung",
+        "price": 169.99
+      },
+      "candidate": {
+        "title": "Samsung 990 PRO 1TB NVMe M.2 Internal SSD",
+        "brand": "Samsung",
+        "price": 99.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "capacity-same",
+      "source": {
+        "title": "Samsung 990 PRO 2TB NVMe M.2 SSD",
+        "brand": "Samsung",
+        "price": 169.99
+      },
+      "candidate": {
+        "title": "Samsung 990 PRO Series 2TB PCIe 4.0 NVMe SSD MZ-V9P2T0B/AM",
+        "brand": "Samsung",
+        "price": 159.99
+      },
+      "label": "same"
+    },
+    {
+      "id": "pack-size-conflict",
+      "source": {
+        "title": "Tide PODS Laundry Detergent Spring Meadow 150 Count",
+        "brand": "Tide",
+        "price": 32.99
+      },
+      "candidate": {
+        "title": "Tide PODS Laundry Detergent Spring Meadow 42 Count",
+        "brand": "Tide",
+        "price": 12.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "pack-size-worded-differently",
+      "note": "Consumable with no model number; equivalent pack size worded two ways.",
+      "source": {
+        "title": "Hanes Men's Cushion Crew Socks White 12 Pack",
+        "brand": "Hanes",
+        "price": 18.99
+      },
+      "candidate": {
+        "title": "Hanes Mens Crew Sock White 12 Pair Value Pack",
+        "brand": "Hanes",
+        "price": 16.49
+      },
+      "label": "same"
+    },
+    {
+      "id": "bundle-vs-standalone",
+      "source": {
+        "title": "Instant Pot Duo 7-in-1 Electric Pressure Cooker 6 Quart",
+        "brand": "Instant Pot",
+        "price": 99.95
+      },
+      "candidate": {
+        "title": "Instant Pot Duo 7-in-1 6QT Bundle with Glass Lid and Cookbook",
+        "brand": "Instant Pot",
+        "price": 139.95
+      },
+      "label": "different"
+    },
+    {
+      "id": "refurbished",
+      "source": {
+        "title": "Dyson V15 Detect Cordless Vacuum",
+        "brand": "Dyson",
+        "price": 749.99
+      },
+      "candidate": {
+        "title": "Dyson V15 Detect Cordless Vacuum - Certified Refurbished",
+        "brand": "Dyson",
+        "price": 429.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "model-field-authoritative",
+      "note": "Titles share almost nothing; retailer-supplied model fields agree.",
+      "source": {
+        "title": "LG C3 Series 65-Inch Class OLED evo Smart TV",
+        "brand": "LG",
+        "model": "OLED65C3PUA",
+        "price": 1596.99
+      },
+      "candidate": {
+        "title": "LG 65\" Class C3 OLED 4K UHD Smart webOS TV",
+        "brand": "LG",
+        "model": "OLED65C3PUA",
+        "price": 1499.99
+      },
+      "label": "same"
+    },
+    {
+      "id": "model-field-conflict",
+      "source": {
+        "title": "LG C3 Series 65-Inch OLED TV",
+        "brand": "LG",
+        "model": "OLED65C3PUA",
+        "price": 1596.99
+      },
+      "candidate": {
+        "title": "LG C3 Series 55-Inch OLED TV",
+        "brand": "LG",
+        "model": "OLED55C3PUA",
+        "price": 1096.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "verbose-marketplace-title",
+      "note": "Correct match buried in marketplace keyword spam.",
+      "source": {
+        "title": "Nintendo Switch OLED Model White",
+        "brand": "Nintendo",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "NEW Nintendo Switch OLED Model Handheld Console 64GB White Joy-Con FREE SHIP US",
+        "brand": "Nintendo",
+        "price": 339.0
+      },
+      "label": "same"
+    },
+    {
+      "id": "same-category-different-product",
+      "source": {
+        "title": "Ninja BL610 Professional Blender 1000W",
+        "brand": "Ninja",
+        "price": 89.99
+      },
+      "candidate": {
+        "title": "Ninja BN701 Professional Plus Blender 1400W",
+        "brand": "Ninja",
+        "price": 119.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "size-differs-apparel",
+      "source": {
+        "title": "Carhartt Men's Acrylic Watch Hat One Size Black",
+        "brand": "Carhartt",
+        "price": 19.99
+      },
+      "candidate": {
+        "title": "Carhartt Men's Acrylic Watch Hat One Size Navy",
+        "brand": "Carhartt",
+        "price": 18.5
+      },
+      "label": "different"
+    },
+    {
+      "id": "identical-title",
+      "source": {
+        "title": "Kindle Paperwhite 16GB",
+        "brand": "Amazon",
+        "price": 149.99
+      },
+      "candidate": {
+        "title": "Kindle Paperwhite 16GB",
+        "brand": "Amazon",
+        "price": 139.99
+      },
+      "label": "same"
+    },
+    {
+      "id": "unrelated",
+      "source": {
+        "title": "Sony WH-1000XM5 Headphones",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Logitech MX Master 3S Wireless Mouse",
+        "brand": "Logitech",
+        "price": 99.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "watch-series",
+      "source": {
+        "title": "Apple Watch Series 9 GPS 45mm Midnight Aluminum",
+        "brand": "Apple",
+        "price": 429.0
+      },
+      "candidate": {
+        "title": "Apple Watch Series 8 GPS 45mm Midnight Aluminum Case",
+        "brand": "Apple",
+        "price": 329.0
+      },
+      "label": "different"
+    },
+    {
+      "id": "shared-capacity-token",
+      "note": "Different laptops sharing a storage capacity; capacity is not a model code.",
+      "source": {
+        "title": "Dell XPS 9520 512GB 16GB RAM Laptop",
+        "brand": "Dell",
+        "price": 1299.0
+      },
+      "candidate": {
+        "title": "Dell Inspiron 3520 512GB Touchscreen Laptop",
+        "brand": "Dell",
+        "price": 549.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "shared-wattage-token",
+      "note": "Different blenders sharing a wattage rating.",
+      "source": {
+        "title": "Ninja BL610 Professional Blender 1000W",
+        "brand": "Ninja",
+        "price": 89.99
+      },
+      "candidate": {
+        "title": "Hamilton Beach Power Elite Blender 1000W",
+        "brand": "Hamilton Beach",
+        "price": 39.99
+      },
+      "label": "different"
+    }
+  ]
+}

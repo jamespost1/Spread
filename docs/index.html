@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spread — Real prices across retailers</title>
+    <meta name="description" content="A Chrome extension that shows what the product you're viewing actually costs at other retailers, with verified same-product matching." />
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --card:#f7f8fa; --fg:#10151c;
+              --muted:#5b6672; --line:#e4e8ee; --accent:#0b6b3a; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#0f1216; --card:#171c22; --fg:#eef2f6; --muted:#9aa6b2;
+                --line:#262c34; --accent:#4ade80; }
+      }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--fg);
+             font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+      .wrap { max-width:760px; margin:0 auto; padding:72px 24px 90px; }
+      h1 { font-size:44px; line-height:1.1; letter-spacing:-0.03em; margin:0 0 14px; }
+      .lede { font-size:19px; color:var(--muted); margin:0 0 32px; max-width:56ch; }
+      .cta { display:inline-block; background:var(--accent); color:#fff; text-decoration:none;
+             padding:12px 24px; border-radius:9px; font-weight:600; font-size:15px; }
+      .cta.secondary { background:transparent; color:var(--fg); border:1px solid var(--line); margin-left:8px; }
+      h2 { font-size:22px; letter-spacing:-0.015em; margin:56px 0 12px; }
+      p { color:var(--muted); }
+      p strong, li strong { color:var(--fg); }
+      .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin:24px 0; }
+      .card { background:var(--card); border:1px solid var(--line); border-radius:11px; padding:18px 20px; }
+      .card h3 { margin:0 0 6px; font-size:15px; }
+      .card p { margin:0; font-size:14px; }
+      pre { background:var(--card); border:1px solid var(--line); border-radius:10px;
+            padding:16px 18px; overflow-x:auto; font-size:13.5px; line-height:1.55; color:var(--fg); }
+      table { width:100%; border-collapse:collapse; margin:18px 0; font-size:15px; }
+      th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); }
+      th { font-weight:600; } td { color:var(--muted); }
+      td strong { color:var(--fg); }
+      footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+               color:var(--muted); font-size:14px; display:flex; gap:18px; flex-wrap:wrap; }
+      a { color:var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Real prices,<br />everywhere else.</h1>
+      <p class="lede">
+        Spread puts one button on product pages at Amazon, Target, Walmart, Best Buy, eBay and
+        Costco. Click it and see what the same item actually costs elsewhere — shipping included,
+        no coupons, no affiliate bait.
+      </p>
+      <a class="cta" href="https://github.com/jamespost1/Spread">View source</a>
+      <a class="cta secondary" href="privacy.html">Privacy policy</a>
+
+      <h2>Same product, or just a similar one?</h2>
+      <p>
+        That question is the entire problem. These two titles are 88% identical and share every
+        meaningful word — and are different products, a hundred dollars apart:
+      </p>
+      <pre>Apple Watch Series 9 GPS 45mm Midnight Aluminum
+Apple Watch Series 8 GPS 45mm Midnight Aluminum Case</pre>
+      <p>These two share almost no wording, and are the same headphones:</p>
+      <pre>Sony WH-1000XM5 Wireless Noise Canceling Headphones
+Sony WH1000XM5 Over-Ear Bluetooth Headphone, Black</pre>
+      <p>
+        Spread runs a two-stage matcher. A deterministic scorer settles the clear cases instantly and
+        for free; only genuinely ambiguous pairs go to a language model, which confirms whether they
+        describe the same item. Fuzzy similarity is allowed to <em>reject</em> a match but never to
+        confirm one — that rule took measured match precision from 50% to 100%.
+      </p>
+
+      <div class="cards">
+        <div class="card">
+          <h3>No setup</h3>
+          <p>No account, no API keys, no configuration. Install and it works.</p>
+        </div>
+        <div class="card">
+          <h3>Price history</h3>
+          <p>Know whether today's price is actually good, not just what it says.</p>
+        </div>
+        <div class="card">
+          <h3>Honest prices</h3>
+          <p>Shipping folded in, USD only, refurbished and bundles excluded. Prices are
+             recorded per product, never per person.</p>
+        </div>
+      </div>
+
+      <h2>Where the prices come from</h2>
+      <table>
+        <tr><th>Retailer</th><th>Role</th></tr>
+        <tr><td><strong>Amazon · Target · Walmart · Costco</strong></td><td>Read from the page you are on</td></tr>
+        <tr><td><strong>Best Buy · eBay</strong></td><td>Read from the page, and queried for prices</td></tr>
+      </table>
+      <p>
+        Prices come from first-party retailer APIs, not scraped search results. Amazon and Target
+        publish no open product API, so they work as source pages rather than comparison targets.
+      </p>
+
+      <footer>
+        <a href="https://github.com/jamespost1/Spread">GitHub</a>
+        <a href="privacy.html">Privacy</a>
+        <span>Open source under MIT.</span>
+      </footer>
+    </div>
+  </body>
+</html>
