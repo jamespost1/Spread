@@ -4,7 +4,7 @@
 // an outbound request belongs there, so the content script sends a message and
 // this worker does the talking.
 
-const DEFAULT_API_BASE = 'https://spread-api.workers.dev';
+const DEFAULT_API_BASE = 'https://spread-api.jamesbpost.workers.dev';
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   // A stable anonymous id, used only for server-side rate limiting. It is a

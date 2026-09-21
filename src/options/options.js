@@ -1,6 +1,6 @@
 // Settings page. Deliberately small: Spread requires no configuration to work.
 
-const DEFAULT_API_BASE = 'https://spread-api.workers.dev';
+const DEFAULT_API_BASE = 'https://spread-api.jamesbpost.workers.dev';
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (new URLSearchParams(location.search).has('welcome')) {
