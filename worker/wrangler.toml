@@ -16,7 +16,7 @@ ALLOWED_ORIGIN = "*"
 # Shared cache: offers (6h), match verdicts (90d), OAuth tokens, budget counters.
 [[kv_namespaces]]
 binding = "SPREAD_KV"
-id = "PLACEHOLDER_RUN_WRANGLER_KV_NAMESPACE_CREATE"
+id = "bcc63dff6dbd4d0a958215a26646f860"
 
 # Secrets -- set with `wrangler secret put <NAME>`, never committed:
 #   BESTBUY_API_KEY      https://developer.bestbuy.com/
