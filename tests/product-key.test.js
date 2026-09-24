@@ -16,6 +16,15 @@ describe('productKey — cross-retailer stability', () => {
     expect(amazon).toBe(bestbuy);
   });
 
+  it('joins retailers that disagree about brand in the model field', () => {
+    // Regression from live data: eBay sent "Sony WH-1000XM5", Amazon sent
+    // "WH-1000XM5", producing two keys for one product.
+    const ebay = productKey({ title: 'Sony WH-1000XM5 Headphones', brand: 'Sony', model: 'Sony WH-1000XM5' });
+    const amazon = productKey({ title: 'Sony WH-1000XM5 Wireless', brand: 'Sony', model: 'WH-1000XM5' });
+    expect(ebay).toBe(amazon);
+    expect(ebay).toBe('m:sony:WH1000XM5');
+  });
+
   it('prefers a declared model field over anything in the title', () => {
     const a = productKey({ title: 'LG C3 Series 65-Inch OLED', brand: 'LG', model: 'OLED65C3PUA' });
     const b = productKey({ title: 'LG 65" Class C3 OLED 4K Smart TV', brand: 'LG', model: 'oled-65-c3-pua' });

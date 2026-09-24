@@ -5,7 +5,7 @@
 // adjudicator in the Cloudflare Worker) only ever sees the pairs Stage 1 marks
 // AMBIGUOUS, which is what keeps the token bill near zero.
 
-import { normalizeTitle, tokenize, extractModelNumbers, extractQuantities } from './normalize.js';
+import { normalizeTitle, tokenize, extractModelNumbers, extractQuantities, canonicalModelCode } from './normalize.js';
 import { jaccard, containment, levenshteinRatio } from './similarity.js';
 
 /** Verdicts the cascade can reach. */
@@ -74,8 +74,8 @@ export function compareProducts(source, candidate) {
   // --- Decisive signal 1: explicit model/SKU fields agree. -----------------
   // Retailer-supplied model numbers are authoritative in a way titles never
   // are, so this outranks everything below it.
-  const sourceModel = cleanCode(source?.model);
-  const candidateModel = cleanCode(candidate?.model);
+  const sourceModel = canonicalModelCode(source?.model, source?.brand);
+  const candidateModel = canonicalModelCode(candidate?.model, candidate?.brand);
   if (sourceModel && candidateModel) {
     if (sourceModel === candidateModel) {
       return result(1, VERDICT.SAME, true, { reason: 'model-field-exact' });
@@ -230,11 +230,6 @@ function findDisqualifier(normalizedA, normalizedB) {
   return null;
 }
 
-function cleanCode(value) {
-  if (!value || typeof value !== 'string') return null;
-  const code = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return code.length >= 4 ? code : null;
-}
 
 function clamp(n) {
   return Math.min(1, Math.max(0, n));

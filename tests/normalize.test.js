@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeTitle, tokenize, extractModelNumbers, extractQuantities,
+  normalizeTitle, tokenize, extractModelNumbers, extractQuantities, canonicalModelCode,
 } from '../src/core/normalize.js';
 
 describe('normalizeTitle', () => {
@@ -87,5 +87,42 @@ describe('extractQuantities', () => {
 
   it('returns an empty list when no quantity is present', () => {
     expect(extractQuantities('Sony Headphones')).toEqual([]);
+  });
+});
+
+describe('canonicalModelCode', () => {
+  it('strips punctuation and casing', () => {
+    expect(canonicalModelCode('wh-1000xm5')).toBe('WH1000XM5');
+  });
+
+  it('drops a brand that the retailer folded into the model field', () => {
+    // Observed live: eBay reports "Sony WH-1000XM5" where Amazon reports
+    // "WH-1000XM5". Without this they are two keys for one product.
+    expect(canonicalModelCode('Sony WH-1000XM5', 'Sony')).toBe('WH1000XM5');
+    expect(canonicalModelCode('WH-1000XM5', 'Sony')).toBe('WH1000XM5');
+  });
+
+  it('keeps the brand when removing it would leave nothing identifying', () => {
+    // "LG" off "LG65" leaves "65", which names no product.
+    expect(canonicalModelCode('LG65', 'LG')).toBe('LG65');
+  });
+
+  it('is unaffected by brand casing or punctuation', () => {
+    expect(canonicalModelCode('BEST-BUY-ABC1234', 'Best Buy')).toBe('ABC1234');
+  });
+
+  it('rejects a letters-only series name', () => {
+    expect(canonicalModelCode('QUIETCOMFORT', 'Bose')).toBeNull();
+  });
+
+  it('rejects a capacity or wattage', () => {
+    expect(canonicalModelCode('512GB')).toBeNull();
+    expect(canonicalModelCode('1000W')).toBeNull();
+  });
+
+  it('rejects anything too short to identify a product', () => {
+    expect(canonicalModelCode('A1')).toBeNull();
+    expect(canonicalModelCode('')).toBeNull();
+    expect(canonicalModelCode(null)).toBeNull();
   });
 });
