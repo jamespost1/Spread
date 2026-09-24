@@ -38,6 +38,9 @@ export const SELECTORS = {
   Target: {
     title: ['h1[data-test="product-title"]', 'h1.product-title', '[data-test="product-title"]'],
     price: [
+      // Target renders the price several times and hides all but one, so the
+      // most specific visible container is tried first.
+      '[data-test="@web/Price/PriceFull"] [data-test="product-price"]',
       '[data-test="product-price"]',
       '[data-test="current-price"]',
       '[itemprop="price"]',

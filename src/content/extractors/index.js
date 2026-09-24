@@ -153,14 +153,90 @@ function firstImage(image) {
   return null;
 }
 
+/**
+ * First element matching any selector, preferring one that is actually visible
+ * and descending into shadow roots when the light DOM has nothing.
+ *
+ * Both behaviours come from live pages. Target renders several price nodes and
+ * hides all but one, so taking the first match anchored the button inside a
+ * `visibility: hidden` container -- present in the DOM, invisible to the user.
+ * Costco puts its price inside web components, where `querySelector` cannot
+ * reach at all.
+ */
 function findFirst(doc, selectors) {
+  let fallback = null;
+
   for (const selector of selectors || []) {
+    let matches;
     try {
-      const el = doc.querySelector(selector);
-      if (el) return el;
+      matches = doc.querySelectorAll(selector);
     } catch {
-      // A selector that a future Chrome rejects should not break extraction.
+      continue; // A selector a future Chrome rejects must not break extraction.
     }
+    for (const el of matches) {
+      if (isVisible(el)) return el;
+      if (!fallback) fallback = el;
+    }
+  }
+
+  // Nothing visible in the light DOM -- try shadow roots before giving up.
+  for (const selector of selectors || []) {
+    const el = queryShadow(doc, selector);
+    if (el) return el;
+  }
+
+  // A hidden match still carries usable text for title or brand; only the
+  // price element is used as a layout anchor, and a hidden anchor beats none.
+  return fallback;
+}
+
+/**
+ * Visibility by computed style only.
+ *
+ * Deliberately not using getBoundingClientRect: a collapsed rect is normal for
+ * an element that has not been laid out yet, and test environments report zero
+ * for everything. `visibility` and `display` inherit the way we need, so an
+ * element inside a hidden container reports hidden here.
+ */
+function isVisible(el) {
+  if (!el) return false;
+  const view = el.ownerDocument?.defaultView;
+  if (!view?.getComputedStyle) return true; // No layout engine: assume visible.
+
+  try {
+    const style = view.getComputedStyle(el);
+    if (!style) return true;
+    if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+    if (style.display === 'none') return false;
+    if (style.opacity !== '' && Number(style.opacity) === 0) return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/** Search open shadow roots breadth-first. Only runs when the light DOM missed. */
+function queryShadow(root, selector, depth = 0) {
+  if (depth > 4) return null;
+
+  let hosts;
+  try {
+    hosts = root.querySelectorAll('*');
+  } catch {
+    return null;
+  }
+
+  for (const host of hosts) {
+    const shadow = host.shadowRoot;
+    if (!shadow) continue;
+    try {
+      const direct = shadow.querySelector(selector);
+      if (direct) return direct;
+    } catch {
+      continue;
+    }
+    const nested = queryShadow(shadow, selector, depth + 1);
+    if (nested) return nested;
   }
   return null;
 }
