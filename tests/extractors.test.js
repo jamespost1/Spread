@@ -215,6 +215,61 @@ describe('extractProduct — real captured pages', () => {
   });
 });
 
+describe('extractProduct — visibility and shadow DOM', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('skips a hidden price node in favour of a visible one', () => {
+    // Captured live on Target: several price nodes, all but one hidden. Taking
+    // the first match anchored the button inside a hidden container, so it was
+    // in the DOM at 121x29 and invisible to the user.
+    page({
+      body: `
+        <h1 data-test="product-title">Sony WH-1000XM5</h1>
+        <div style="visibility:hidden"><span data-test="product-price">$999.99</span></div>
+        <div data-test="@web/Price/PriceFull"><span data-test="product-price">$299.99</span></div>`,
+    });
+
+    const product = extractProduct(document, {
+      hostname: 'www.target.com',
+      href: 'https://www.target.com/p/x/-/A-1',
+    });
+
+    expect(product.price).toBe(299.99);
+    expect(product.priceElement.textContent).toBe('$299.99');
+  });
+
+  it('falls back to a hidden match rather than failing outright', () => {
+    page({
+      body: `
+        <h1 data-test="product-title">Sony WH-1000XM5</h1>
+        <span data-test="product-price" style="visibility:hidden">$299.99</span>`,
+    });
+    const product = extractProduct(document, {
+      hostname: 'www.target.com',
+      href: 'https://www.target.com/p/x/-/A-1',
+    });
+    expect(product?.price).toBe(299.99);
+  });
+
+  it('finds a price inside a shadow root', () => {
+    // Captured live on Costco: 12 shadow roots, price unreachable from the
+    // light DOM.
+    page({ body: '<h1 class="product-title">Soundcore Space One</h1><div id="host"></div>' });
+    const shadow = document.getElementById('host').attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<div class="your-price"><span class="value">$99.99</span></div>';
+
+    const product = extractProduct(document, {
+      hostname: 'www.costco.com',
+      href: 'https://www.costco.com/p/-/soundcore-space-one/4000416065',
+    });
+
+    expect(product).toMatchObject({ retailer: 'Costco', price: 99.99 });
+  });
+});
+
 describe('extractProduct — retailer routing', () => {
   it('returns null off a supported retailer', () => {
     expect(extractProduct(document, { hostname: 'example.com', href: 'https://example.com' })).toBeNull();
