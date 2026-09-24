@@ -156,6 +156,65 @@ describe('extractProduct — selector fallback', () => {
   });
 });
 
+describe('extractProduct — real captured pages', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('reads a Best Buy page on their current URL scheme', () => {
+    // Captured live: /product/<slug>/<alphanumeric-id>, with all the useful
+    // data in JSON-LD rather than in the markup.
+    page({
+      jsonLd: {
+        '@type': 'Product',
+        name: 'Sony - WH-1000XM6- Best Wireless Noise Cancelling Headphones - Black',
+        brand: { '@type': 'Brand', name: 'Sony' },
+        model: 'WH1000XM6/B',
+        offers: { price: 425.49, priceCurrency: 'USD' },
+      },
+    });
+
+    const product = extractProduct(document, {
+      hostname: 'www.bestbuy.com',
+      href: 'https://www.bestbuy.com/product/sony-wh-1000xm6-best-wireless-noise-cancelling-headphones-black/J7XSRH5RCF',
+    });
+
+    expect(product).toMatchObject({
+      retailer: 'Best Buy',
+      price: 425.49,
+      brand: 'Sony',
+      model: 'WH1000XM6/B',
+    });
+  });
+
+  it('reads a Target page from selectors when no JSON-LD is present', () => {
+    // Captured live: Target ships no ld+json at all on product pages.
+    page({
+      body: `
+        <h1 data-test="product-title">Sony WH-1000XM5 Bluetooth Wireless Noise-Canceling Headphones - Black</h1>
+        <span data-test="product-price">$299.99</span>`,
+    });
+
+    const product = extractProduct(document, {
+      hostname: 'www.target.com',
+      href: 'https://www.target.com/p/sony-wh-1000xm5/-/A-86314264',
+    });
+
+    expect(product).toMatchObject({ retailer: 'Target', price: 299.99 });
+    expect(product.priceElement).toBeTruthy();
+  });
+
+  it('accepts a Costco page on their current URL scheme', () => {
+    expect(
+      isProductPage(document, {
+        hostname: 'www.costco.com',
+        href: 'https://www.costco.com/p/-/soundcore-space-one/4000416065?langId=-1',
+      })
+    ).toBe(true);
+  });
+});
+
 describe('extractProduct — retailer routing', () => {
   it('returns null off a supported retailer', () => {
     expect(extractProduct(document, { hostname: 'example.com', href: 'https://example.com' })).toBeNull();
