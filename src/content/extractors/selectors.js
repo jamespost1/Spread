@@ -83,7 +83,9 @@ export const SELECTORS = {
     ],
     image: ['.primary-image', '[data-testid="product-image"] img', '.product-image img'],
     brand: ['[data-testid="brand-link"]', '.brand-link'],
-    productUrl: /\/site\/.*\/\d+\.p|skuId=\d+/i,
+    // Best Buy now serves /product/<slug>/<alphanumeric-id>; the older
+    // /site/<slug>/<digits>.p links still resolve, so both are matched.
+    productUrl: /\/product\/[^/]+\/[A-Z0-9]{6,}|\/site\/.*\/\d+\.p|skuId=\d+/i,
   },
 
   eBay: {
@@ -105,6 +107,8 @@ export const SELECTORS = {
     price: ['.your-price .value', '[automation-id="productPriceOutput"]', '.price .value', '.your-price'],
     image: ['#productImage', '.product-image-container img', '[automation-id="productImage"]'],
     brand: ['[itemprop="brand"]', '.product-brand'],
-    productUrl: /\.product\.\d+\.html|\/.*\.product\./i,
+    // Costco now serves /p/[-/]<slug>/<numeric-id>; the older
+    // <slug>.product.<id>.html links still exist.
+    productUrl: /\/p\/.*\/\d{6,}|\.product\.\d+\.html/i,
   },
 };
