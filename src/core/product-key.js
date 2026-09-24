@@ -10,7 +10,7 @@
 // That is the same failure as a false match, so it gets the same treatment --
 // return null and record nothing rather than guess.
 
-import { normalizeTitle, tokenize, extractModelNumbers } from './normalize.js';
+import { normalizeTitle, tokenize, extractModelNumbers, canonicalModelCode } from './normalize.js';
 
 /** Minimum distinctive tokens before a title-derived key is trustworthy. */
 const MIN_TOKENS = 3;
@@ -39,7 +39,7 @@ export function productKey(product) {
 
   // Strongest: an explicit manufacturer model number. Globally unique in
   // practice, and identical across every retailer that carries the item.
-  const declared = cleanCode(product.model);
+  const declared = canonicalModelCode(product.model, product.brand);
   if (declared) return brand ? `m:${brand}:${declared}` : `m:${declared}`;
 
   // Next: a model code mined from the title. Only trusted when exactly one
@@ -99,10 +99,3 @@ function canonicalCodes(codes) {
   return kept;
 }
 
-function cleanCode(value) {
-  if (!value || typeof value !== 'string') return null;
-  const code = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  // Require a digit: a letters-only "model" is nearly always a series name.
-  if (code.length < 4 || !/[0-9]/.test(code)) return null;
-  return code;
-}

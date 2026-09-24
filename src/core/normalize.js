@@ -142,3 +142,37 @@ function normalizeUnit(unit) {
   };
   return aliases[unit] || unit;
 }
+
+/**
+ * Canonicalize a retailer-supplied model field into a comparable code.
+ *
+ * Retailers disagree about whether the brand belongs in the model field: eBay
+ * reports "Sony WH-1000XM5" where Amazon reports "WH-1000XM5". Left alone that
+ * yields SONYWH1000XM5 and WH1000XM5 -- two keys for one product, which breaks
+ * cross-retailer joining and, worse, reads as a model *conflict* to the matcher
+ * and confidently rejects a correct match.
+ *
+ * @param {string|null|undefined} value Raw model field.
+ * @param {string} [brand] Brand, in any casing.
+ * @returns {string|null} Uppercased alphanumeric code, or null if unusable.
+ */
+export function canonicalModelCode(value, brand = '') {
+  if (!value || typeof value !== 'string') return null;
+
+  let code = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const brandCode = String(brand || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Drop a leading brand, but only when what remains still looks like a model
+  // number -- "LG" off "LG65" would leave "65", which identifies nothing.
+  if (brandCode && code.startsWith(brandCode)) {
+    const remainder = code.slice(brandCode.length);
+    if (remainder.length >= 4 && /[0-9]/.test(remainder)) code = remainder;
+  }
+
+  if (code.length < 4) return null;
+  // A letters-only "model" is a series name; a number-plus-unit is a spec.
+  if (!/[0-9]/.test(code)) return null;
+  if (MEASUREMENT.test(code)) return null;
+
+  return code;
+}
