@@ -82,7 +82,12 @@ async function handleCompare(request, env, ctx) {
 
   const cached = await getOffers(env.SPREAD_KV, cacheKey);
   if (cached) {
-    return json({ ...cached, offers: withoutSource(cached.offers, product.retailer), cached: true });
+    return json({
+      ...cached,
+      offers: withoutSource(cached.offers, product.retailer),
+      carried: withoutSource(cached.carried, product.retailer),
+      cached: true,
+    });
   }
 
   // --- Fan out to every price source we have -------------------------------
@@ -159,12 +164,19 @@ async function handleCompare(request, env, ctx) {
   // verification; everything from Shopping does.
   const ranked = dedupeByRetailer(offers);
   const fromObservation = ranked.filter((o) => o.source === 'observed');
-  const verified = await resolveAndVerify(
+  const { offers: verified, carried } = await resolveAndVerify(
     ranked.filter((o) => o.source !== 'observed'), product, env
   );
 
+  const quoted = [...verified, ...fromObservation].sort(byRelevanceThenPrice);
+  const quotedNames = new Set(quoted.map((o) => (o.retailer || '').toLowerCase()));
+
   const payload = {
-    offers: [...verified, ...fromObservation].sort(byRelevanceThenPrice),
+    offers: quoted,
+    // Never repeat a retailer that already appears with a price.
+    carried: carried
+      .filter((c) => !quotedNames.has((c.retailer || '').toLowerCase()))
+      .slice(0, MAX_CARRIED),
     sources: { ...sources, observed: { ok: true, count: observed.length } },
     matching: {
       candidates: candidates.length,
@@ -186,7 +198,12 @@ async function handleCompare(request, env, ctx) {
   if (anySourceLive) {
     ctx.waitUntil(putOffers(env.SPREAD_KV, cacheKey, payload));
   }
-  return json({ ...payload, offers: withoutSource(payload.offers, product.retailer), cached: false });
+  return json({
+    ...payload,
+    offers: withoutSource(payload.offers, product.retailer),
+    carried: withoutSource(payload.carried, product.retailer),
+    cached: false,
+  });
 }
 
 /**
@@ -237,26 +254,28 @@ function withoutSource(offers, sourceRetailer) {
 const RESOLVE_TOP_N = 6;
 
 /**
- * Replace each offer's price with the one on the page it links to.
+ * Resolve each offer to a product page and read the price off it.
  *
- * Google Shopping is only a discovery signal here: it says which retailers
- * carry the thing. The number shown has to come from the page the shopper
- * will land on, or the two can disagree -- which they did, by $118, when the
- * price and the link were resolved independently.
+ * Google Shopping is only a discovery signal: it says which retailers carry
+ * the thing. The number shown has to come from the page the shopper will land
+ * on, or the two can disagree -- which they did, by $118, when price and link
+ * were resolved independently.
  *
- * An offer that cannot be resolved to a page, cannot be read, or whose page
- * turns out to be a different product is dropped. Fewer offers that are right
- * beats more offers that are not.
+ * Splits into two outcomes rather than one. An offer whose price can be read
+ * is quoted. An offer that resolved to a real page but whose price cannot be
+ * read is still worth naming -- the retailer demonstrably carries it and the
+ * link works -- but without a price, because asserting a number no page
+ * supports is the one failure this product must not have.
  *
- * @returns {object[]} The offers worth showing.
+ * @returns {{offers: object[], carried: object[]}}
  */
 async function resolveAndVerify(offers, product, env) {
-  if (!env.SERPER_API_KEY) return [];
+  if (!env.SERPER_API_KEY) return { offers: [], carried: [] };
 
   const query = product.model || product.title;
   const considered = offers.slice(0, RESOLVE_TOP_N);
 
-  const checked = await Promise.all(
+  const results = await Promise.all(
     considered.map(async (offer) => {
       const url = await resolveProductUrl(
         offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV, product.title
@@ -264,7 +283,10 @@ async function resolveAndVerify(offers, product, env) {
       if (!url) return null;
 
       const verified = await verifyPrice(url, env.SERPER_API_KEY, env.SPREAD_KV);
-      if (!verified) return null;
+      if (!verified) {
+        // Real page, unreadable price. Name the retailer, quote nothing.
+        return { carried: { retailer: offer.retailer, url } };
+      }
 
       // The page we found has to still be the product being compared. The URL
       // came from a separate search, so this is the step that catches it
@@ -276,18 +298,26 @@ async function resolveAndVerify(offers, product, env) {
       }
 
       return {
-        ...offer,
-        price: verified.price,
-        title: verified.title || offer.title,
-        url,
-        urlKind: 'product-page',
-        priceSource: 'verified-on-page',
+        offer: {
+          ...offer,
+          price: verified.price,
+          title: verified.title || offer.title,
+          url,
+          urlKind: 'product-page',
+          priceSource: 'verified-on-page',
+        },
       };
     })
   );
 
-  return checked.filter(Boolean);
+  return {
+    offers: results.map((r) => r?.offer).filter(Boolean),
+    carried: results.map((r) => r?.carried).filter(Boolean),
+  };
 }
+
+/** Retailers worth naming without a price. A footnote, not a second list. */
+const MAX_CARRIED = 5;
 
 /**
  * One offer per retailer. Offers arrive already ranked, so the first occurrence

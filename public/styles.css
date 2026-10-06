@@ -186,6 +186,24 @@
   .spread-spinner { border-color: #262c34; border-top-color: #4ade80; }
 }
 
+.spread-carried { display: flex !important; flex-wrap: wrap; gap: 7px; }
+.spread-carried-link {
+  padding: 6px 11px !important;
+  border: 1px solid #d6dbe2 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  font-size: 12.5px !important;
+  color: #10151c !important;
+  text-decoration: none !important;
+}
+.spread-carried-link:hover { background: #f7f8fa !important; border-color: #b9c2cc !important; }
+.spread-carried-note { margin: 8px 0 0 !important; font-size: 11px !important; color: #8a94a0 !important; }
+
+@media (prefers-color-scheme: dark) {
+  .spread-carried-link { background: #1f252c !important; border-color: #333b45 !important; color: #eef2f6 !important; }
+  .spread-carried-link:hover { background: #262d35 !important; }
+}
+
 /* Price history */
 .spread-history-row { display: flex; gap: 10px; margin-bottom: 10px; }
 .spread-stat {

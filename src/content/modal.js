@@ -135,6 +135,9 @@ function renderResults(body, product, response, history = null) {
   if (similar.length > 0) {
     body.appendChild(buildSection('Worth considering', buildOfferTable(product, similar)));
   }
+  if ((response.carried || []).length > 0) {
+    body.appendChild(buildCarried(response.carried));
+  }
 
   body.appendChild(buildFooter(response));
 }
@@ -200,6 +203,34 @@ function statBlock(label, value, highlight = false) {
   block.appendChild(el('span', 'spread-stat-value', value));
   block.appendChild(el('span', 'spread-stat-label', label));
   return block;
+}
+
+/**
+ * Retailers that stock the product but whose price could not be read.
+ *
+ * Deliberately priceless. Spread can say a retailer carries something from a
+ * resolved product page, but it cannot say what it costs without reading that
+ * page -- and quoting an unverified number is how a comparison ends up $118
+ * wrong. A name and a working link assert only what is actually known.
+ */
+function buildCarried(carried) {
+  const section = el('section', 'spread-section');
+  section.appendChild(el('h3', 'spread-section-title', 'Also carried at'));
+
+  const list = el('div', 'spread-carried');
+  for (const entry of carried) {
+    if (!isSafeHttpUrl(entry.url)) continue;
+    const link = el('a', 'spread-carried-link', entry.retailer || 'Retailer');
+    link.href = entry.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    list.appendChild(link);
+  }
+  section.appendChild(list);
+  section.appendChild(
+    el('p', 'spread-carried-note', 'Price not confirmed — check the listing.')
+  );
+  return section;
 }
 
 function buildSection(title, content) {
