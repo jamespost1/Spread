@@ -3,6 +3,7 @@ import { hashKey } from '../worker/src/cache.js';
 import { reserveCall, budgetStatus } from '../worker/src/budget.js';
 import { adjudicate } from '../worker/src/adjudicator.js';
 import { handleChallenge, handleNotification } from '../worker/src/ebay-compliance.js';
+import { priceAppearsOnPage } from '../worker/src/adapters/verify.js';
 import nodeCrypto from 'node:crypto';
 
 /** Minimal in-memory stand-in for a KV namespace. */
@@ -189,5 +190,39 @@ describe('eBay account-deletion endpoint', () => {
   it('still returns 200 for an unreadable body so eBay stops retrying', async () => {
     const request = new Request('https://x/ebay/account-deletion', { method: 'POST', body: 'not json' });
     expect((await handleNotification(request)).status).toBe(200);
+  });
+});
+
+describe('priceAppearsOnPage', () => {
+  const page = 'Sony WH-1000XM5 Headphones Black\n\n$349.99\n\nreg $399.99\n\nSave $50.00';
+
+  it('confirms a price the page actually shows', () => {
+    expect(priceAppearsOnPage(page, 349.99)).toBe(true);
+  });
+
+  it('rejects a price the page does not show', () => {
+    // The exact failure this exists for: Google claimed $256.27 for an eBay
+    // listing whose page said $374.99.
+    expect(priceAppearsOnPage(page, 256.27)).toBe(false);
+  });
+
+  it('does not match a price embedded inside a larger number', () => {
+    expect(priceAppearsOnPage('subtotal 1,349.99', 49.99)).toBe(false);
+    expect(priceAppearsOnPage('$1299.00', 299.0)).toBe(false);
+  });
+
+  it('accepts grouped and plain thousands', () => {
+    expect(priceAppearsOnPage('now 1,299.00', 1299)).toBe(true);
+    expect(priceAppearsOnPage('now 1299.00', 1299)).toBe(true);
+  });
+
+  it('accepts whole dollars written without cents', () => {
+    expect(priceAppearsOnPage('just $378 today', 378)).toBe(true);
+  });
+
+  it('rejects unusable input', () => {
+    expect(priceAppearsOnPage('', 10)).toBe(false);
+    expect(priceAppearsOnPage('$10.00', 0)).toBe(false);
+    expect(priceAppearsOnPage('$10.00', NaN)).toBe(false);
   });
 });

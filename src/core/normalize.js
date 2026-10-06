@@ -176,3 +176,36 @@ export function canonicalModelCode(value, brand = '') {
 
   return code;
 }
+
+/**
+ * Listings for something that goes *with* a product rather than the product.
+ *
+ * These are the hardest false positives in the system, because an accessory
+ * names the model it fits -- "Headphone Covers for WH-1000XM6" carries the
+ * exact code that is otherwise the strongest identity signal there is. Both
+ * matching and identity need the same answer here, or an accessory is filed
+ * under the product it merely mentions.
+ */
+const ACCESSORY = new RegExp(
+  '\\b(' +
+    'case|cover|covers|sleeve|pouch|skin|shell|bag|' +
+    'screen protector|protector|charger|charging (?:cable|dock|stand)|cable|cord|adapter|' +
+    'mount|stand|holder|strap|band|clip|' +
+    'ear ?(?:tips|pads|cushions|hooks)|tips|pads|cushions|' +
+    'replacement parts?|spare|accessor(?:y|ies)' +
+  ')\\b[^.]{0,30}\\b(?:for|compatible with|fits)\\b',
+  'i'
+);
+
+/** The same thing stated the other way round. */
+const ACCESSORY_PREFIX = /\b(?:compatible with|designed for|fits)\b/i;
+
+/**
+ * Whether a title describes an accessory for some other product.
+ * @param {string} title
+ * @returns {boolean}
+ */
+export function isAccessoryTitle(title) {
+  const text = String(title || '');
+  return ACCESSORY.test(text) || ACCESSORY_PREFIX.test(text);
+}

@@ -10,7 +10,9 @@
 // That is the same failure as a false match, so it gets the same treatment --
 // return null and record nothing rather than guess.
 
-import { normalizeTitle, tokenize, extractModelNumbers, canonicalModelCode } from './normalize.js';
+import {
+  normalizeTitle, tokenize, extractModelNumbers, canonicalModelCode, isAccessoryTitle,
+} from './normalize.js';
 
 /** Minimum distinctive tokens before a title-derived key is trustworthy. */
 const MIN_TOKENS = 3;
@@ -37,6 +39,13 @@ export function productKey(product) {
 
   const brand = normalizeTitle(product.brand || '').replace(/\s+/g, '');
 
+  // An accessory names the model it fits, so a model-derived key would file it
+  // under the product it merely mentions -- a $15.99 set of headphone covers
+  // was recorded as a price for the headphones. Accessories get their own
+  // namespace so they can still be tracked without contaminating the product.
+  const accessory = isAccessoryTitle(product.title);
+  const prefix = accessory ? 'a' : 'm';
+
   // Strongest: an explicit manufacturer model number.
   //
   // The brand is deliberately NOT part of a model-derived key. Retailers
@@ -50,13 +59,13 @@ export function productKey(product) {
   // to it. The length and digit requirements in canonicalModelCode are what
   // keep a short code from colliding across manufacturers.
   const declared = canonicalModelCode(product.model, product.brand);
-  if (declared) return `m:${declared}`;
+  if (declared) return `${prefix}:${declared}`;
 
   // Next: a model code mined from the title. Only trusted when exactly one
   // distinct candidate survives -- several means we cannot tell which
   // identifies the product and which is a capacity, a year, or a pack count.
   const mined = canonicalCodes(extractModelNumbers(product.title || ''));
-  if (mined.length === 1) return `m:${mined[0]}`;
+  if (mined.length === 1) return `${prefix}:${mined[0]}`;
 
   // Weakest: brand plus distinctive title tokens. Requires a known brand, so
   // that a generic title can never collide across manufacturers.
@@ -69,7 +78,7 @@ export function productKey(product) {
   const distinctive = [...new Set(tokens)].sort().slice(0, 6);
   if (distinctive.length < MIN_TOKENS) return null;
 
-  return `t:${brand}:${distinctive.join('-')}`;
+  return `${accessory ? 'at' : 't'}:${brand}:${distinctive.join('-')}`;
 }
 
 /**
@@ -81,7 +90,7 @@ export function productKey(product) {
  */
 export function keyStrength(key) {
   if (!key) return 'none';
-  return key.startsWith('m:') ? 'strong' : 'weak';
+  return key.startsWith('m:') || key.startsWith('a:') ? 'strong' : 'weak';
 }
 
 /**

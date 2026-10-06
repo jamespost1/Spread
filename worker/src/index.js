@@ -16,7 +16,7 @@ import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
 import { searchShopping } from './adapters/serper.js';
 import { resolveProductUrl } from './adapters/resolve-url.js';
-import { readProductPage } from './adapters/verify.js';
+import { readProductPage, priceAppearsOnPage } from './adapters/verify.js';
 import { adjudicate } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
@@ -294,19 +294,33 @@ async function resolveAndVerify(offers, product, env) {
       if (match.verdict === VERDICT.DIFFERENT) return null;
       offer.match = match;
 
-      if (!Number.isFinite(page.price)) {
-        // Right product, unreadable price. Name it, quote nothing.
-        return { carried: { retailer: offer.retailer, url } };
+      // Structured data is the best source, but several retailers render the
+      // price client-side and publish none. For those, fall back to checking
+      // whether the price Google attributed to this retailer actually appears
+      // on the retailer's own page. That is corroboration rather than
+      // extraction: a number is only used if the page says it too, which is
+      // precisely the check the $118 eBay error would have failed.
+      let price = page.price;
+      let priceSource = 'verified-on-page';
+
+      if (!Number.isFinite(price)) {
+        if (Number.isFinite(offer.price) && priceAppearsOnPage(page.text, offer.price)) {
+          price = offer.price;
+          priceSource = 'corroborated-on-page';
+        } else {
+          // Right product, no price we can stand behind. Name it, quote nothing.
+          return { carried: { retailer: offer.retailer, url } };
+        }
       }
 
       return {
         offer: {
           ...offer,
-          price: page.price,
+          price,
           title: page.title || offer.title,
           url,
           urlKind: 'product-page',
-          priceSource: 'verified-on-page',
+          priceSource,
         },
       };
     })

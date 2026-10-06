@@ -5,7 +5,10 @@
 // adjudicator in the Cloudflare Worker) only ever sees the pairs Stage 1 marks
 // AMBIGUOUS, which is what keeps the token bill near zero.
 
-import { normalizeTitle, tokenize, extractModelNumbers, extractQuantities, canonicalModelCode } from './normalize.js';
+import {
+  normalizeTitle, tokenize, extractModelNumbers, extractQuantities,
+  canonicalModelCode, isAccessoryTitle,
+} from './normalize.js';
 import { jaccard, containment, levenshteinRatio } from './similarity.js';
 
 /** Verdicts the cascade can reach. */
@@ -42,27 +45,6 @@ const DISQUALIFIERS = [
   'refurbished', 'refurb', 'renewed', 'preowned', 'used', 'openbox',
   'bundle', 'forparts', 'replacement',
 ];
-
-/**
- * Listings for something that goes *with* the product rather than the product.
- *
- * These are the hardest false positives in the set, because an accessory
- * listing names the model it fits -- "Carrying Case for WH-1000XM5" carries the
- * exact code that is otherwise the strongest same-product signal there is.
- */
-const ACCESSORY = new RegExp(
-  '\\b(' +
-    'case|cover|sleeve|pouch|skin|shell|bag|' +
-    'screen protector|protector|charger|charging (?:cable|dock|stand)|cable|cord|adapter|' +
-    'mount|stand|holder|strap|band|clip|' +
-    'ear ?(?:tips|pads|cushions|hooks)|tips|pads|cushions|' +
-    'replacement parts?|spare|accessor(?:y|ies)' +
-  ')\\b[^.]{0,30}\\b(?:for|compatible with|fits)\\b',
-  'i'
-);
-
-/** Also an accessory, stated the other way round. */
-const ACCESSORY_PREFIX = /\b(?:compatible with|designed for|fits)\b/i;
 
 /**
  * Blend weights for the fuzzy path, used only when no decisive signal fires.
@@ -256,9 +238,8 @@ function findSharedCode(codesA, codesB) {
 function isAccessoryFor(candidateTitle, sourceTitle) {
   const candidate = String(candidateTitle || '');
   const source = String(sourceTitle || '');
-  const accessoryish = (t) => ACCESSORY.test(t) || ACCESSORY_PREFIX.test(t);
   // If the source is itself an accessory, these are peers, not product vs part.
-  return accessoryish(candidate) && !accessoryish(source);
+  return isAccessoryTitle(candidate) && !isAccessoryTitle(source);
 }
 
 /** A condition/bundle marker present on exactly one side. */

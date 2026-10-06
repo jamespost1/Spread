@@ -30,7 +30,7 @@ const VERIFIED_TTL_SECONDS = 6 * 60 * 60;
  * @param {string} url Product page to read.
  * @param {string} apiKey Serper key.
  * @param {KVNamespace} kv
- * @returns {Promise<{title: string, price: number|null}|null>}
+ * @returns {Promise<{title: string, price: number|null, text: string}|null>}
  */
 export async function readProductPage(url, apiKey, kv) {
   if (!url || !apiKey) return null;
@@ -56,6 +56,12 @@ export async function readProductPage(url, apiKey, kv) {
     if (response.ok) {
       const data = await response.json();
       result = readProduct(data.jsonld, data.metadata?.title);
+      if (result) {
+        // Keep the top of the page only. A price further down belongs to a
+        // related item, a recommendation carousel or a bundle, and would
+        // corroborate the wrong thing.
+        result.text = String(data.text || '').slice(0, 4000);
+      }
     }
   } catch {
     return null; // Leave the cache alone so a transient failure can retry.
@@ -70,10 +76,10 @@ export async function readProductPage(url, apiKey, kv) {
 /**
  * Pull name and price out of a page's structured data.
  *
- * Only JSON-LD is trusted. The scrape also returns page text, and a price
- * could be pattern-matched out of it -- but that is precisely the unreliable
- * snippet-scraping the previous implementation of this project got wrong, and
- * a wrong price is worse than a missing one.
+ * Only JSON-LD is trusted as a *source* of a price. Several retailers --
+ * Target among them -- render the price client-side and ship no structured
+ * data at all, so there is frequently nothing here to read. Those are handled
+ * by corroboration instead: see priceAppearsOnPage.
  */
 function readProduct(jsonld, pageTitle) {
   const product = findProduct(jsonld, 0);
@@ -127,4 +133,47 @@ function firstOffer(offers) {
   if (!offers) return null;
   if (Array.isArray(offers)) return offers[0] || null;
   return offers;
+}
+
+/**
+ * Whether a price Google attributed to this retailer actually appears on the
+ * retailer's own page.
+ *
+ * This is corroboration, not extraction, and the distinction is the whole
+ * point. Pattern-matching a price *out of* page text is how the previous
+ * implementation of this project produced numbers no listing supported.
+ * Checking whether a number obtained elsewhere is *present* carries no such
+ * risk: the only way to pass is for the page to say it too.
+ *
+ * It is exactly the check that would have caught the worst bug this project
+ * has had -- Google claimed an eBay offer at $256.27 while the listing said
+ * $374.99, and that page never contained $256.27.
+ *
+ * @param {string} text Page text, already truncated to the top of the page.
+ * @param {number} price Price to look for.
+ * @returns {boolean}
+ */
+export function priceAppearsOnPage(text, price) {
+  if (!text || !Number.isFinite(price) || price <= 0) return false;
+
+  const whole = Math.floor(price);
+  const cents = Math.round((price - whole) * 100);
+  const grouped = whole.toLocaleString('en-US');
+
+  // Accept the forms a retailer actually renders: grouped or plain thousands,
+  // cents present or omitted, with or without the symbol. Require a boundary
+  // so 49.99 cannot be satisfied by 1,349.99.
+  const amounts = new Set([
+    `${grouped}.${String(cents).padStart(2, '0')}`,
+    `${whole}.${String(cents).padStart(2, '0')}`,
+  ]);
+  if (cents === 0) {
+    amounts.add(grouped);
+    amounts.add(String(whole));
+  }
+
+  return [...amounts].some((amount) => {
+    const escaped = amount.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^0-9.,])\\$?\\s?${escaped}(?![0-9])`).test(text);
+  });
 }

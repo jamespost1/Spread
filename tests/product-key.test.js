@@ -112,3 +112,36 @@ describe('keyStrength', () => {
     expect(keyStrength(null)).toBe('none');
   });
 });
+
+describe('productKey — accessories', () => {
+  it('does not file an accessory under the product it names', () => {
+    // Observed live: Target headphone covers were recorded at $15.99 as a
+    // price for the headphones, because an accessory names the model it fits.
+    const product = productKey({
+      title: 'Sony WH-1000XM6 Wireless Headphones', brand: 'Sony', model: 'WH1000XM6',
+    });
+    const accessory = productKey({
+      title: 'Headphone Covers for Sony WH-1000XM6', brand: 'Sony', model: 'WH1000XM6',
+    });
+    expect(product).toBeTruthy();
+    expect(accessory).toBeTruthy();
+    expect(accessory).not.toBe(product);
+  });
+
+  it('separates accessories whichever way the title is phrased', () => {
+    const product = productKey({ title: 'Sony WH-1000XM5 Headphones', brand: 'Sony' });
+    for (const title of [
+      'Carrying Case for Sony WH-1000XM5',
+      'Hard Shell Case Compatible with Sony WH-1000XM5',
+      'Replacement Ear Pads for Sony WH-1000XM5',
+    ]) {
+      expect(productKey({ title, brand: 'Sony' }), title).not.toBe(product);
+    }
+  });
+
+  it('still groups the same accessory across retailers', () => {
+    const a = productKey({ title: 'Carrying Case for Sony WH-1000XM5', brand: 'Geekria' });
+    const b = productKey({ title: 'Hard Case for Sony WH-1000XM5', brand: 'Geekria' });
+    expect(a).toBe(b);
+  });
+});
