@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { retailerFromUrl, sourceRetailerFor, isSafeHttpUrl, retailerSearchUrl } from '../src/core/retailers.js';
+import { retailerFromUrl, sourceRetailerFor, isSafeHttpUrl, retailerSearchUrl, isKnownRetailer } from '../src/core/retailers.js';
 
 describe('retailerFromUrl', () => {
   it('identifies a retailer from a full URL', () => {
@@ -80,5 +80,32 @@ describe('retailerSearchUrl', () => {
 
   it('produces a safe http url', () => {
     expect(isSafeHttpUrl(retailerSearchUrl('Walmart', 'WH1000XM5'))).toBe(true);
+  });
+});
+
+describe('isKnownRetailer', () => {
+  it('accepts retailers a shopper would recognise', () => {
+    for (const n of ['Target', 'Best Buy', 'Walmart', "Macy's", 'Newegg', 'B&H Photo']) {
+      expect(isKnownRetailer(n), n).toBe(true);
+    }
+  });
+
+  it('rejects the long tail Google Shopping surfaces', () => {
+    // Observed live: grey-market importers and dropshippers whose prices are
+    // typically unreachable or not for the same goods.
+    for (const n of ['papita', 'HKairport Shop', 'Teds Electronics', 'Daily Spirit Deals']) {
+      expect(isKnownRetailer(n), n).toBe(false);
+    }
+  });
+
+  it('ignores punctuation and casing', () => {
+    expect(isKnownRetailer('best buy')).toBe(true);
+    expect(isKnownRetailer('BESTBUY')).toBe(true);
+    expect(isKnownRetailer('Macys')).toBe(true);
+  });
+
+  it('rejects empty input', () => {
+    expect(isKnownRetailer('')).toBe(false);
+    expect(isKnownRetailer(null)).toBe(false);
   });
 });

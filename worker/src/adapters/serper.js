@@ -16,7 +16,7 @@
 // goes through the match cascade before a shopper ever sees it.
 
 import { parsePrice } from '../../../src/core/price.js';
-import { retailerFromUrl, retailerSearchUrl } from '../../../src/core/retailers.js';
+import { retailerFromUrl, retailerSearchUrl, isKnownRetailer } from '../../../src/core/retailers.js';
 
 const ENDPOINT = 'https://google.serper.dev/shopping';
 
@@ -76,26 +76,41 @@ function toOffer(item, product) {
   const price = parsePrice(String(item.price ?? ''));
   if (!Number.isFinite(price) || price <= 0) return null;
 
-  const { retailer, seller } = splitMerchant(item.source) ;
+  const { retailer, seller } = splitMerchant(item.source);
   const name = retailer || (item.link ? retailerFromUrl(item.link) : null);
   if (!name) return null;
+
+  // Quote only retailers a shopper would recognise and can reach. The long
+  // tail Google returns is mostly unreachable or not the same goods.
+  if (!isKnownRetailer(name)) return null;
 
   // Never offer the page the shopper is already on as an alternative.
   if (product.retailer && name.toLowerCase() === product.retailer.toLowerCase()) {
     return null;
   }
 
-  // Google only ever links back to Google, so prefer the retailer's own search
-  // for the model -- it lands on the right store with the product in reach.
+  // Serper exposes no merchant URL, so route to wherever the offer is actually
+  // reachable. A retailer's own search finds its own stock reliably; it will
+  // not find a marketplace seller's listing, and for those the Google product
+  // page is the only destination that names the seller and links to a purchase.
+  const marketplace = Boolean(seller) && seller.toLowerCase() !== name.toLowerCase();
+  const productPage = item.productId
+    ? `https://www.google.com/shopping/product/${encodeURIComponent(item.productId)}`
+    : null;
   const storeSearch = retailerSearchUrl(name, product.model || product.title);
+
+  const target = marketplace
+    ? productPage || storeSearch || item.link
+    : storeSearch || productPage || item.link;
+  if (!target) return null;
 
   return {
     retailer: name,
-    seller,
+    seller: marketplace ? seller : null,
     title: item.title || '',
     price,
-    url: storeSearch || item.link || null,
-    urlKind: storeSearch ? 'store-search' : 'google',
+    url: target,
+    urlKind: target === storeSearch ? 'store-search' : target === productPage ? 'offer-page' : 'google',
     imageUrl: item.imageUrl || null,
     brand: null,
     model: null,

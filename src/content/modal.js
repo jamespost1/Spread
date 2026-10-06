@@ -248,9 +248,11 @@ function buildOfferTable(product, offers) {
       const label =
         offer.urlKind === 'store-search'
           ? `Find at ${offer.retailer}`
-          : /(^|\.)google\./i.test(safeHost(offer.url))
-            ? 'View on Google'
-            : 'Visit store';
+          : offer.urlKind === 'offer-page'
+            ? 'See offer'
+            : /(^|\.)google\./i.test(safeHost(offer.url))
+              ? 'View on Google'
+              : 'Visit store';
       const link = el('a', 'spread-offer-link', label);
       link.href = offer.url;
       link.target = '_blank';

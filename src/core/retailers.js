@@ -38,6 +38,26 @@ const RETAILER_NAMES = {
 };
 
 /**
+ * Whether a merchant name is a retailer Spread is willing to quote.
+ *
+ * Google Shopping surfaces a long tail of unknown storefronts -- grey-market
+ * importers, dropshippers, airport duty-free shops -- whose prices are often
+ * unreachable or not for the same goods. Quoting them makes the comparison
+ * look rich and be worthless. Narrower and trustworthy beats broad and not.
+ *
+ * @param {string} name Merchant display name.
+ * @returns {boolean}
+ */
+export function isKnownRetailer(name) {
+  if (!name || typeof name !== 'string') return false;
+  const needle = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!needle) return false;
+  return Object.values(RETAILER_NAMES).some(
+    (display) => display.toLowerCase().replace(/[^a-z0-9]/g, '') === needle
+  );
+}
+
+/**
  * Resolve a hostname or URL to a human-readable retailer name.
  * @param {string} input
  * @returns {string|null}
