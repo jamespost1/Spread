@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Small-size variant. Three bars become mush below ~32px, so this drops
+       to two, thickens them, and tightens the padding. Same idea: one price,
+       and a better one. -->
+  <rect width="16" height="16" rx="3.5" fill="#101614"/>
+  <rect x="3" y="4.25" width="10" height="2.75" rx="1.375" fill="#8A9994"/>
+  <rect x="3" y="9" width="5.75" height="2.75" rx="1.375" fill="#4ADE80"/>
+</svg>
