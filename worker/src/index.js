@@ -15,6 +15,7 @@ import { productKey, keyStrength } from '../../src/core/product-key.js';
 import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
 import { searchShopping } from './adapters/serper.js';
+import { resolveProductUrl } from './adapters/resolve-url.js';
 import { adjudicate } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
@@ -137,8 +138,14 @@ async function handleCompare(request, env, ctx) {
     .sort(byRelevanceThenPrice)
     .slice(0, 12);
 
+  // Upgrade the top offers from a search page to the actual product page.
+  // Only the ones a shopper is likely to click, because each unresolved pair
+  // costs a search credit -- though a resolved one is cached for a month.
+  const ranked = dedupeByRetailer(offers);
+  await resolveTopUrls(ranked, product, env);
+
   const payload = {
-    offers: dedupeByRetailer(offers),
+    offers: ranked,
     sources: { ...sources, observed: { ok: true, count: observed.length } },
     matching: {
       candidates: candidates.length,
@@ -197,6 +204,34 @@ async function handleObserve(request, env) {
   });
 
   return json({ recorded: wrote, history: summary });
+}
+
+/** How many offers get a real product URL looked up per comparison. */
+const RESOLVE_TOP_N = 4;
+
+/**
+ * Replace search-page destinations with real product pages, in parallel.
+ *
+ * Mutates in place. Anything that cannot be resolved keeps the destination it
+ * already had, so this can only improve a link, never remove one.
+ */
+async function resolveTopUrls(offers, product, env) {
+  if (!env.SERPER_API_KEY) return;
+
+  const query = product.model || product.title;
+  const targets = offers
+    .filter((o) => o.urlKind === 'store-search' || o.urlKind === 'google')
+    .slice(0, RESOLVE_TOP_N);
+
+  await Promise.all(
+    targets.map(async (offer) => {
+      const url = await resolveProductUrl(offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV);
+      if (url) {
+        offer.url = url;
+        offer.urlKind = 'product-page';
+      }
+    })
+  );
 }
 
 /**

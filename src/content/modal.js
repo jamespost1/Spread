@@ -246,8 +246,10 @@ function buildOfferTable(product, offers) {
       // so most links are the retailer's own search for the model rather than
       // a product page, and a few fall back to Google.
       const label =
-        offer.urlKind === 'store-search'
-          ? `Find at ${offer.retailer}`
+        offer.urlKind === 'product-page'
+          ? 'View listing'
+          : offer.urlKind === 'store-search'
+            ? `Find at ${offer.retailer}`
           : offer.urlKind === 'offer-page'
             ? 'See offer'
             : /(^|\.)google\./i.test(safeHost(offer.url))
