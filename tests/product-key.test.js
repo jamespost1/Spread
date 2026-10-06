@@ -173,3 +173,38 @@ describe('productKey — variant suffixes', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('productKey — bundles', () => {
+  it('does not give a bundle the identity of the item inside it', () => {
+    // Observed live: a Best Buy bundle page at $409.99 shared a key with the
+    // standalone headphones, inherited their price history, and was told it
+    // could "save $35" by buying the single item it contains.
+    const bundle = productKey({
+      title: 'Bundle - Sony - WH-1000XM6 Headphones + Charger',
+      brand: 'Sony', model: 'WH1000XM6/B',
+    });
+    const standalone = productKey({
+      title: 'Sony - WH-1000XM6 Headphones - Black',
+      brand: 'Sony', model: 'WH1000XM6/B',
+    });
+    expect(bundle).not.toBe(standalone);
+  });
+
+  it('recognises bundles however they are phrased', () => {
+    const standalone = productKey({ title: 'Sony WH-1000XM6 Headphones', brand: 'Sony', model: 'WH1000XM6' });
+    for (const title of [
+      'Sony WH-1000XM6 Headphones + Carrying Case',
+      'Sony WH-1000XM6 Headphones Bundle',
+      'Sony WH-1000XM6 Headphones w/ Stand',
+      'Sony WH-1000XM6 Headphones Combo',
+    ]) {
+      expect(productKey({ title, brand: 'Sony', model: 'WH1000XM6' }), title).not.toBe(standalone);
+    }
+  });
+
+  it('groups the same bundle across retailers', () => {
+    const a = productKey({ title: 'Sony WH-1000XM6 Bundle', brand: 'Sony', model: 'WH1000XM6' });
+    const b = productKey({ title: 'Bundle - Sony WH-1000XM6', brand: 'Sony', model: 'WH-1000XM6' });
+    expect(a).toBe(b);
+  });
+});

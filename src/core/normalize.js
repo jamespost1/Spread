@@ -217,3 +217,23 @@ export function isAccessoryTitle(title) {
   const text = String(title || '');
   return ACCESSORY.test(text) || ACCESSORY_PREFIX.test(text);
 }
+
+/**
+ * Whether a title describes a bundle rather than a single item.
+ *
+ * A bundle names the product it contains, so it keys and matches as that
+ * product unless caught here. Observed live: a Best Buy bundle page at
+ * $409.99 shared an identity with the standalone headphones, inherited their
+ * price history, and was told it could "save $35" by buying fewer things.
+ *
+ * @param {string} title
+ * @returns {boolean}
+ */
+export function isBundleTitle(title) {
+  const text = String(title || '');
+  if (/\bbundle\b|\bkit\b|\bcombo\b|\bpackage deal\b/i.test(text)) return true;
+  // "Headphones + Charger", "Camera w/ Lens", "Console and Controller Set".
+  if (/\s\+\s|\bw\/\s/i.test(text)) return true;
+  if (/\b(?:with|and|plus)\b[^,]{0,40}\b(?:set|pack)\b/i.test(text)) return true;
+  return false;
+}

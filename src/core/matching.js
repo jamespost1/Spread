@@ -7,7 +7,7 @@
 
 import {
   normalizeTitle, tokenize, extractModelNumbers, extractQuantities,
-  canonicalModelCode, isAccessoryTitle,
+  canonicalModelCode, isAccessoryTitle, isBundleTitle,
 } from './normalize.js';
 import { jaccard, containment, levenshteinRatio } from './similarity.js';
 
@@ -90,6 +90,11 @@ export function compareProducts(source, candidate) {
   if (extras.length > 0) {
     // Priced as a package, so the figure is not this product's price.
     return result(0.2, VERDICT.DIFFERENT, true, { reason: 'bundled-extras', extras });
+  }
+  // And the reverse: a standalone item is not a substitute for a bundle. It
+  // is cheaper because it is less, which is not a saving.
+  if (isBundleTitle(sourceTitle) !== isBundleTitle(candidateTitle)) {
+    return result(0.2, VERDICT.DIFFERENT, true, { reason: 'bundle-mismatch' });
   }
 
   // --- Decisive signal 1: explicit model/SKU fields agree. -----------------

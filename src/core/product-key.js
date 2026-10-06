@@ -11,7 +11,8 @@
 // return null and record nothing rather than guess.
 
 import {
-  normalizeTitle, tokenize, extractModelNumbers, canonicalModelCode, isAccessoryTitle,
+  normalizeTitle, tokenize, extractModelNumbers, canonicalModelCode,
+  isAccessoryTitle, isBundleTitle,
 } from './normalize.js';
 
 /** Minimum distinctive tokens before a title-derived key is trustworthy. */
@@ -43,8 +44,13 @@ export function productKey(product) {
   // under the product it merely mentions -- a $15.99 set of headphone covers
   // was recorded as a price for the headphones. Accessories get their own
   // namespace so they can still be tracked without contaminating the product.
+  // A bundle names the product inside it, so without its own namespace it
+  // inherits that product's identity -- and with it, the product's price
+  // history and offers. A bundle page was told it could save $35 by buying
+  // the standalone item it contains.
   const accessory = isAccessoryTitle(product.title);
-  const prefix = accessory ? 'a' : 'm';
+  const bundle = !accessory && isBundleTitle(product.title);
+  const prefix = accessory ? 'a' : bundle ? 'b' : 'm';
 
   // Strongest: an explicit manufacturer model number.
   //
@@ -78,7 +84,7 @@ export function productKey(product) {
   const distinctive = [...new Set(tokens)].sort().slice(0, 6);
   if (distinctive.length < MIN_TOKENS) return null;
 
-  return `${accessory ? 'at' : 't'}:${brand}:${distinctive.join('-')}`;
+  return `${accessory ? 'at' : bundle ? 'bt' : 't'}:${brand}:${distinctive.join('-')}`;
 }
 
 /**
@@ -90,7 +96,7 @@ export function productKey(product) {
  */
 export function keyStrength(key) {
   if (!key) return 'none';
-  return key.startsWith('m:') || key.startsWith('a:') ? 'strong' : 'weak';
+  return /^[mab]:/.test(key) ? 'strong' : 'weak';
 }
 
 /**

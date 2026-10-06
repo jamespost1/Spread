@@ -164,7 +164,7 @@ function buildHeadline(product, sameOffers, history, carriedCount = 0) {
 function buildHistory(history) {
   const section = el('section', 'spread-section spread-history');
   section.appendChild(
-    el('h3', 'spread-section-title', `Price at ${history.retailer} over ${history.days} days`)
+    el('h3', 'spread-section-title', `Price at ${history.retailer} over ${historyDays(history)}`)
   );
 
   const row = el('div', 'spread-history-row');
@@ -179,12 +179,12 @@ function buildHistory(history) {
 
   if (history.isLowest) {
     section.appendChild(
-      el('p', 'spread-history-note is-good', `This is the lowest price in ${history.days} days.`)
+      el('p', 'spread-history-note is-good', `This is the lowest price in ${historyDays(history)}.`)
     );
   } else if (Number.isFinite(history.lowest) && history.current > history.lowest) {
     const above = formatPrice(Math.round((history.current - history.lowest) * 100) / 100);
     section.appendChild(
-      el('p', 'spread-history-note', `${above} above the lowest price seen in ${history.days} days.`)
+      el('p', 'spread-history-note', `${above} above the lowest price seen in ${historyDays(history)}.`)
     );
   }
 
@@ -196,6 +196,12 @@ function buildHistory(history) {
     )
   );
   return section;
+}
+
+/** "1 day" rather than "1 days". */
+function historyDays(history) {
+  const days = history.days || 1;
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
 function statBlock(label, value, highlight = false) {

@@ -177,6 +177,16 @@ describe('compareProducts — the precision invariant', () => {
     expect(r.verdict).not.toBe(VERDICT.DIFFERENT);
   });
 
+  it('rejects a standalone item offered against a bundle', () => {
+    // The reverse direction, observed live: a bundle page was offered the
+    // standalone product as a $35 saving. It is cheaper because it is less.
+    const r = compareProducts(
+      { title: 'Bundle - Sony WH-1000XM6 Headphones + Charger', brand: 'Sony' },
+      { title: 'Sony WH-1000XM6 Headphones Black', brand: 'Sony', price: 374.99 }
+    );
+    expect(r.verdict).toBe(VERDICT.DIFFERENT);
+  });
+
   it('rejects a bundle against the standalone item', () => {
     const r = compareProducts(
       { title: 'Instant Pot Duo 6 Quart', brand: 'Instant Pot' },
