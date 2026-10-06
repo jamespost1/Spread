@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey } from '../worker/src/cache.js';
 import { reserveCall, budgetStatus } from '../worker/src/budget.js';
-import { adjudicate } from '../worker/src/adjudicator.js';
+import { adjudicate, lastAdjudicatorError } from '../worker/src/adjudicator.js';
 import { handleChallenge, handleNotification } from '../worker/src/ebay-compliance.js';
 import { priceAppearsOnPage } from '../worker/src/adapters/verify.js';
 import nodeCrypto from 'node:crypto';
@@ -224,5 +224,48 @@ describe('priceAppearsOnPage', () => {
     expect(priceAppearsOnPage('', 10)).toBe(false);
     expect(priceAppearsOnPage('$10.00', 0)).toBe(false);
     expect(priceAppearsOnPage('$10.00', NaN)).toBe(false);
+  });
+});
+
+describe('adjudicator failure reporting', () => {
+  const source = { title: 'Sony WH-1000XM5 Headphones', brand: 'Sony', price: 349.99 };
+  const candidates = [
+    { title: 'Sony WH-1000XM4 Headphones', price: 279, match: { verdict: 'ambiguous', score: 0.79 } },
+  ];
+
+  it('records a failure so an expired key does not degrade silently', async () => {
+    const kv = fakeKV();
+    // A rejected fetch is a connection error; an expired key is a 401
+    // *response*. Only the latter exercises the credential branch.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await adjudicate(source, candidates, {
+      SPREAD_KV: kv, ADJUDICATION_DAILY_LIMIT: 10, ANTHROPIC_API_KEY: 'sk-expired',
+    });
+
+    const failure = await lastAdjudicatorError(kv);
+    expect(failure).toBeTruthy();
+    expect(failure.credential).toBe(true);
+    expect(failure.at).toBeTypeOf('string');
+  });
+
+  it('marks a network failure as not a credential problem', async () => {
+    const kv = fakeKV();
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network unreachable'));
+
+    await adjudicate(source, candidates, {
+      SPREAD_KV: kv, ADJUDICATION_DAILY_LIMIT: 10, ANTHROPIC_API_KEY: 'sk-test',
+    });
+
+    expect((await lastAdjudicatorError(kv)).credential).toBe(false);
+  });
+
+  it('reports nothing when the adjudicator has not failed', async () => {
+    expect(await lastAdjudicatorError(fakeKV())).toBeNull();
   });
 });

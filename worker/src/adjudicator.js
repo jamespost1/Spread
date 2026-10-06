@@ -132,6 +132,7 @@ export async function adjudicate(source, candidates, env) {
     stats.error = String(error?.message || error);
     stats.skipped += pending.length;
     for (const { index, candidate } of pending) resolved[index] = fallback(candidate);
+    await recordFailure(env.SPREAD_KV, stats.error);
   }
 
   return { candidates: resolved, stats };
@@ -221,4 +222,45 @@ function clamp01(n) {
   const value = Number(n);
   if (!Number.isFinite(value)) return 0.5;
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * Leave a breadcrumb when the model call fails.
+ *
+ * Adjudication degrades silently by design -- a failed call costs precision,
+ * not availability -- which means an expired or revoked key looks exactly like
+ * a quiet week. `/health` reports whether a key is *present*, and a dead key is
+ * still present. This is the only thing that distinguishes the two.
+ *
+ * Self-clearing: the record expires after a day, so a stale failure does not
+ * keep flagging a service that has since recovered.
+ */
+async function recordFailure(kv, message) {
+  const text = String(message || '');
+  // 401 and 403 mean the credential, not the network. Worth calling out,
+  // because that is the failure that will not fix itself.
+  const credential = /\b(401|403|authentication|unauthorized|invalid[_ ]api[_ ]key|expired)\b/i.test(text);
+
+  try {
+    await kv.put(
+      'adjudicator:last-error',
+      JSON.stringify({ at: new Date().toISOString(), credential, message: text.slice(0, 200) }),
+      { expirationTtl: 24 * 60 * 60 }
+    );
+  } catch {
+    // Diagnostics must never take down the request they are describing.
+  }
+}
+
+/**
+ * The most recent adjudication failure, if one happened in the last day.
+ * @param {KVNamespace} kv
+ */
+export async function lastAdjudicatorError(kv) {
+  try {
+    const raw = await kv.get('adjudicator:last-error');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }

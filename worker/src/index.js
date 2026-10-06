@@ -17,7 +17,7 @@ import { searchEbay } from './adapters/ebay.js';
 import { searchShopping } from './adapters/serper.js';
 import { resolveProductUrl } from './adapters/resolve-url.js';
 import { readProductPage, priceAppearsOnPage } from './adapters/verify.js';
-import { adjudicate } from './adjudicator.js';
+import { adjudicate, lastAdjudicatorError } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
 import { handleChallenge, handleNotification } from './ebay-compliance.js';
@@ -402,12 +402,37 @@ async function health(env) {
       ebay: Boolean(env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET),
       shopping: Boolean(env.SERPER_API_KEY),
     },
-    adjudicator: {
-      configured: Boolean(env.ANTHROPIC_API_KEY),
-      model: env.ADJUDICATOR_MODEL || 'claude-haiku-4-5',
-    },
+    adjudicator: await adjudicatorStatus(env),
     shopping: await budgetStatus(env.SPREAD_KV, shoppingLimitFrom(env), 'shopping'),
   };
+}
+
+/**
+ * Adjudicator health.
+ *
+ * "Configured" only means a key is present, and an expired key is still
+ * present -- so a recent failure is reported alongside it. A credential
+ * failure is called out separately because it is the one that will not
+ * resolve on its own.
+ */
+async function adjudicatorStatus(env) {
+  const status = {
+    configured: Boolean(env.ANTHROPIC_API_KEY),
+    model: env.ADJUDICATOR_MODEL || 'claude-haiku-4-5',
+  };
+  if (!status.configured) return status;
+
+  const failure = await lastAdjudicatorError(env.SPREAD_KV);
+  if (failure) {
+    status.healthy = false;
+    status.lastError = failure;
+    if (failure.credential) {
+      status.hint = 'Credential rejected — the key is likely expired or revoked.';
+    }
+  } else {
+    status.healthy = true;
+  }
+  return status;
 }
 
 /** Fixed-window rate limit. Cheap and good enough at this scale. */

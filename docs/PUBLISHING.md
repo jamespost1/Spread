@@ -254,6 +254,29 @@ an address on a domain you control. The cheapest route:
 The domain doubles as the landing page host, which reads far better than a
 `github.io` URL on a resume.
 
+## 4d. Watch for an expired adjudicator key
+
+Anthropic API keys can expire. Expiry is silent from the extension's side:
+matching quietly stops confirming ambiguous pairs and falls back to "similar".
+
+`/health` reports it, because "configured" only means a key is present and an
+expired key is still present:
+
+```bash
+curl -s https://spread-api.jamesbpost.workers.dev/health | jq .adjudicator
+```
+
+A `healthy: false` with `credential: true` means the key was rejected. Rotate it:
+
+```bash
+cd worker
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler deploy
+```
+
+Billing note: a Claude Pro or Max subscription does **not** cover API usage.
+The API is metered separately at console.anthropic.com.
+
 ## 5. Lock down CORS after the first publish
 
 Once the extension has a stable Web Store ID, restrict the Worker to it — until then any page can
