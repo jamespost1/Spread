@@ -3,7 +3,7 @@
 **Know whether today's price is actually good.**
 
 [![CI](https://github.com/jamespost1/Spread/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/Spread/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-140%20passing-0b6b3a)](tests/)
+[![Tests](https://img.shields.io/badge/tests-210%20passing-0b6b3a)](tests/)
 [![Match precision](https://img.shields.io/badge/match%20precision-100%25-0b6b3a)](evals/)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -92,8 +92,13 @@ or a model code mined from both titles. Everything else goes to Stage 2 or gets 
 | Configuration | Accuracy | Precision | Recall | F1 |
 |---|---|---|---|---|
 | Fuzzy scoring may confirm | 60.0% | 50.0% | 50.0% | 0.500 |
-| **Decisive signals only** (current) | **80.0%** | **100.0%** | 50.0% | 0.667 |
-| Full cascade (Stage 1 + Claude) | run `npm run eval:llm` | | | |
+| Stage 1 only — decisive signals | 84.0% | **100.0%** | 50.0% | 0.667 |
+| **Full cascade — Stage 1 + Stage 2** | **100.0%** | **100.0%** | **100.0%** | **1.000** |
+
+Stage 1 alone is never wrong and often silent: it confirms only half of genuine
+matches, because it refuses to confirm anything a model code does not back. The
+adjudicator resolves the other half without giving up precision — 12 of 25 pairs
+reached it, at $0.016 for the run.
 
 Measured by [`evals/run.mjs`](evals/run.mjs) over a [labeled set](evals/fixtures/product-pairs.json)
 of deliberately hard pairs — adjacent model generations, capacity variants, bundles, refurbished
@@ -197,7 +202,7 @@ every URL is scheme-validated before it reaches an `href`.
 
 ```bash
 npm install
-npm test           # 140 unit tests
+npm test           # 210 unit tests
 npm run coverage   # enforces 85% on src/core
 npm run eval       # measures the matcher, no credentials needed
 npm run build      # produces a loadable extension in dist/
