@@ -12,7 +12,7 @@ ADJUDICATION_DAILY_LIMIT = "200"
 # Google Shopping lookups per UTC day. Serper's free allowance is a fixed grant
 # rather than a monthly reset, so this keeps a burst from consuming it. At 60/day
 # a month of normal use stays inside the free 2,500.
-SHOPPING_DAILY_LIMIT = "60"
+SHOPPING_DAILY_LIMIT = "250"
 # Third-party marketplace listings are excluded by default: their price cannot
 # be verified, the seller is not the named retailer, and no page shows that
 # specific offer. Set to "true" to include them.
