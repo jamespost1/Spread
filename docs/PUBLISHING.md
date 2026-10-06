@@ -46,11 +46,13 @@ Know whether today's price is actually good. Spread tracks price history on the 
 
 **Detailed description:**
 
-> Rejected once for keyword spam: the six retailer names appeared twice, once
-> inside a sentence and again as a standalone list. Google reads a repeated
-> brand-name list as stuffing. They are now named exactly once, in a sentence
-> that explains where the extension runs. Do not reintroduce a "supported
-> retailers" block.
+> Rejected twice for keyword spam, both times on the retailer list. The second
+> rejection quoted the *single* remaining mention, so the problem is the
+> enumerated list of brand names itself, not how often it appears. Do not name
+> the retailers in listing metadata at all.
+>
+> Nothing is lost by omitting them: Chrome shows users exactly which sites the
+> extension can access at install time, generated from the manifest.
 
 ```
 Spread tells you whether the price in front of you is actually a good one.
@@ -62,24 +64,24 @@ too.
 
 WHERE IT WORKS
 
-Spread runs on product pages at six major US retailers: Amazon, Target, Walmart,
-Best Buy, eBay and Costco. It cannot run anywhere else.
+Spread runs on product pages at six of the largest US retail sites. Chrome shows you
+exactly which ones before you install, and the extension cannot run anywhere else.
 
 WHAT MAKES IT DIFFERENT
 
 Spread will not show you a price it cannot stand behind. Every number it quotes was
-read from the page it links to — that retailer's own listing, not a search result or
-a cached figure. When a price cannot be confirmed, Spread names the store and says
-so instead of guessing.
+read from the page it links to — that store's own listing, not a search result or a
+cached figure. When a price cannot be confirmed, Spread names the store and says so
+instead of guessing.
 
 That means you will sometimes see fewer results than other comparison tools show you.
 It also means the numbers are real.
 
 It is equally careful about what counts as the same product. A carrying case that
 mentions your headphones is not your headphones. A refurbished unit is not a new one.
-A bundle with a charger thrown in is not the standalone item. "Apple Watch Series 9"
-and "Series 8" are 88% identical as text and a hundred dollars apart — Spread treats
-them as different, because they are.
+A bundle with a charger thrown in is not the standalone item. Two adjacent model
+years of the same product can be 88% identical as text and a hundred dollars apart —
+Spread treats them as different, because they are.
 
 HOW TO USE IT
 
