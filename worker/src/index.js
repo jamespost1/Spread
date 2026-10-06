@@ -80,14 +80,23 @@ async function handleCompare(request, env, ctx) {
   const identity = productKey(product);
   const cacheKey = identity || hashKey(product.title, product.model || '');
 
+  // Observed prices are read fresh on every request, never served from the
+  // offer cache. They change the moment anyone opens a product page, and
+  // freezing them for six hours meant browsing a retailer and then checking
+  // from another showed nothing -- the cached answer predated the visit.
+  // The cache holds only what is expensive to produce: Shopping lookups,
+  // page resolutions and price reads.
+  const observedNow = identity && keyStrength(identity) === 'strong'
+    ? (await observedOffers(env.SPREAD_KV, identity, product.retailer)).map((offer) => ({
+        ...offer,
+        title: product.title,
+        match: { verdict: VERDICT.SAME, stage: 'observed', score: 1 },
+      }))
+    : [];
+
   const cached = await getOffers(env.SPREAD_KV, cacheKey);
   if (cached) {
-    return json({
-      ...cached,
-      offers: withoutSource(cached.offers, product.retailer),
-      carried: withoutSource(cached.carried, product.retailer),
-      cached: true,
-    });
+    return json(serve(cached, observedNow, product.retailer, true));
   }
 
   // --- Fan out to every price source we have -------------------------------
@@ -160,22 +169,17 @@ async function handleCompare(request, env, ctx) {
   // Upgrade the top offers from a search page to the actual product page.
   // Only the ones a shopper is likely to click, because each unresolved pair
   // costs a search credit -- though a resolved one is cached for a month.
-  // Observed prices come from pages Spread read itself, so they need no
-  // verification; everything from Shopping does.
-  const ranked = dedupeByRetailer(offers);
-  const fromObservation = ranked.filter((o) => o.source === 'observed');
   const { offers: verified, carried } = await resolveAndVerify(
-    ranked.filter((o) => o.source !== 'observed'), product, env
+    dedupeByRetailer(offers), product, env
   );
 
-  const quoted = [...verified, ...fromObservation].sort(byRelevanceThenPrice);
-  const quotedNames = new Set(quoted.map((o) => (o.retailer || '').toLowerCase()));
+  const verifiedNames = new Set(verified.map((o) => (o.retailer || '').toLowerCase()));
 
   const payload = {
-    offers: quoted,
+    offers: verified.sort(byRelevanceThenPrice),
     // Never repeat a retailer that already appears with a price.
     carried: carried
-      .filter((c) => !quotedNames.has((c.retailer || '').toLowerCase()))
+      .filter((c) => !verifiedNames.has((c.retailer || '').toLowerCase()))
       .slice(0, MAX_CARRIED),
     sources: { ...sources, observed: { ok: true, count: observed.length } },
     matching: {
@@ -198,12 +202,7 @@ async function handleCompare(request, env, ctx) {
   if (anySourceLive) {
     ctx.waitUntil(putOffers(env.SPREAD_KV, cacheKey, payload));
   }
-  return json({
-    ...payload,
-    offers: withoutSource(payload.offers, product.retailer),
-    carried: withoutSource(payload.carried, product.retailer),
-    cached: false,
-  });
+  return json(serve(payload, observedNow, product.retailer, false));
 }
 
 /**
@@ -241,6 +240,34 @@ async function handleObserve(request, env) {
   });
 
   return json({ recorded: wrote, history: summary });
+}
+
+/**
+ * Assemble the response: cached Shopping results plus observations read now.
+ *
+ * A live API price outranks an observation of the same retailer, since it was
+ * read during this lookup rather than whenever someone last happened to visit.
+ */
+function serve(payload, observedNow, sourceRetailer, cached) {
+  const priced = withoutSource(payload.offers, sourceRetailer);
+  const pricedNames = new Set(priced.map((o) => (o.retailer || '').toLowerCase()));
+
+  const observed = withoutSource(observedNow, sourceRetailer).filter(
+    (o) => !pricedNames.has((o.retailer || '').toLowerCase())
+  );
+
+  const offers = [...priced, ...observed].sort(byRelevanceThenPrice);
+  const shownNames = new Set(offers.map((o) => (o.retailer || '').toLowerCase()));
+
+  return {
+    ...payload,
+    offers,
+    carried: withoutSource(payload.carried, sourceRetailer).filter(
+      (c) => !shownNames.has((c.retailer || '').toLowerCase())
+    ),
+    matching: { ...payload.matching, fromObservations: observed.length },
+    cached,
+  };
 }
 
 /** Never offer the shopper the page they are already looking at. */
@@ -374,6 +401,10 @@ async function health(env) {
       bestbuy: Boolean(env.BESTBUY_API_KEY),
       ebay: Boolean(env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET),
       shopping: Boolean(env.SERPER_API_KEY),
+    },
+    adjudicator: {
+      configured: Boolean(env.ANTHROPIC_API_KEY),
+      model: env.ADJUDICATOR_MODEL || 'claude-haiku-4-5',
     },
     shopping: await budgetStatus(env.SPREAD_KV, shoppingLimitFrom(env), 'shopping'),
   };

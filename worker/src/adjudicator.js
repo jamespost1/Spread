@@ -96,11 +96,20 @@ export async function adjudicate(source, candidates, env) {
   if (pending.length === 0) return { candidates: resolved, stats };
 
   // Pass 2: one batched call for everything still unknown.
-  const budget = await reserveCall(env.SPREAD_KV, dailyLimitFrom(env));
-
-  if (!budget.allowed || !env.ANTHROPIC_API_KEY) {
+  //
+  // The key is checked before reserving, so a deployment without one does not
+  // burn the daily counter on calls it was never going to make.
+  if (!env.ANTHROPIC_API_KEY) {
     stats.skipped = pending.length;
-    stats.error = budget.allowed ? 'no-api-key' : 'budget-exhausted';
+    stats.error = 'no-api-key';
+    for (const { index, candidate } of pending) resolved[index] = fallback(candidate);
+    return { candidates: resolved, stats };
+  }
+
+  const budget = await reserveCall(env.SPREAD_KV, dailyLimitFrom(env));
+  if (!budget.allowed) {
+    stats.skipped = pending.length;
+    stats.error = 'budget-exhausted';
     for (const { index, candidate } of pending) resolved[index] = fallback(candidate);
     return { candidates: resolved, stats };
   }
