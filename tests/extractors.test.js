@@ -270,6 +270,72 @@ describe('extractProduct — visibility and shadow DOM', () => {
   });
 });
 
+describe('extractProduct — anchor validation', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('never anchors to a matching element that holds no price', () => {
+    // Observed live on Best Buy: a wildcard price selector matched an empty
+    // header component, so the button was injected beside the shopping cart
+    // even though the price itself came from JSON-LD and was correct.
+    page({
+      jsonLd: {
+        '@type': 'Product',
+        name: 'Sony WH-1000XM6',
+        offers: { price: 425.49, priceCurrency: 'USD' },
+      },
+      body: `
+        <header><div data-testid="large-customer-price"></div></header>
+        <main><div class="pricing-price__value">$425.49</div></main>`,
+    });
+
+    const product = extractProduct(document, {
+      hostname: 'www.bestbuy.com',
+      href: 'https://www.bestbuy.com/product/sony/J7XSRH5RCF',
+    });
+
+    expect(product.price).toBe(425.49);
+    expect(product.priceElement.textContent).toContain('425.49');
+  });
+
+  it('reads a Costco page on their current markup', () => {
+    // Captured live: MUI rebuild, price in the light DOM behind data-testid.
+    page({
+      body: `
+        <h1>Beats Studio Pro - Wireless Bluetooth Noise Cancelling Headphones</h1>
+        <button id="Button_zipcodeSelector">30301</button>
+        <div data-testid="single-price-content">
+          <span data-testid="Text_single-price-whole-value">$129.99</span>
+        </div>`,
+    });
+
+    const product = extractProduct(document, {
+      hostname: 'www.costco.com',
+      href: 'https://www.costco.com/p/-/beats-studio-pro/4201023248?langId=-1',
+    });
+
+    expect(product).toMatchObject({ retailer: 'Costco', price: 129.99 });
+    expect(product.title).toContain('Beats Studio Pro');
+  });
+
+  it('does not mistake a zip code for a price on Costco', () => {
+    page({
+      body: `
+        <h1>Beats Studio Pro</h1>
+        <button id="Button_zipcodeSelector">30301</button>`,
+    });
+    // No real price anywhere, so nothing should be extracted at all.
+    expect(
+      extractProduct(document, {
+        hostname: 'www.costco.com',
+        href: 'https://www.costco.com/p/-/beats/4201023248',
+      })
+    ).toBeNull();
+  });
+});
+
 describe('extractProduct — retailer routing', () => {
   it('returns null off a supported retailer', () => {
     expect(extractProduct(document, { hostname: 'example.com', href: 'https://example.com' })).toBeNull();

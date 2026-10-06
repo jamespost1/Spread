@@ -123,9 +123,9 @@ function annotateButton(history) {
   if (!button || !history) return;
 
   if (history.isLowest && history.days >= 7) {
-    button.textContent = `Check price · lowest in ${history.days}d`;
+    button.textContent = `Price history · lowest in ${history.days}d`;
   } else if (history.dropFromHighest > 0) {
-    button.textContent = 'Check price · history';
+    button.textContent = 'Price history';
   }
 }
 
@@ -136,7 +136,7 @@ function injectButton(product) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = BUTTON_CLASS;
-  button.textContent = 'Check price';
+  button.textContent = 'Price history';
   button.setAttribute('aria-label', 'Check this price against its history and other retailers');
 
   button.addEventListener('click', (event) => {

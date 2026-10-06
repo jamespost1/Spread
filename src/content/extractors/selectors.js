@@ -82,7 +82,7 @@ export const SELECTORS = {
       '.priceView-customer-price',
       '.priceView-hero-price span[aria-hidden="true"]',
       '.pricing-price__value',
-      '[class*="pricing-price"]',
+      '[data-testid="large-customer-price"]',
     ],
     image: ['.primary-image', '[data-testid="product-image"] img', '.product-image img'],
     brand: ['[data-testid="brand-link"]', '.brand-link'],
@@ -106,8 +106,21 @@ export const SELECTORS = {
   },
 
   Costco: {
-    title: ['h1[automation-id="productOutputTitle"]', '.product-title h1', 'h1.product-title'],
-    price: ['.your-price .value', '[automation-id="productPriceOutput"]', '.price .value', '.your-price'],
+    title: [
+      'h1[automation-id="productOutputTitle"]',
+      '.product-title h1',
+      'h1.product-title',
+      // Current site puts the product name in the only h1 on the page.
+      'h1',
+    ],
+    price: [
+      // Current site (MUI rebuild). The container carries the full amount.
+      '[data-testid="single-price-content"]',
+      '[data-testid="Text_single-price-whole-value"]',
+      '.your-price .value',
+      '[automation-id="productPriceOutput"]',
+      '.price .value',
+    ],
     image: ['#productImage', '.product-image-container img', '[automation-id="productImage"]'],
     brand: ['[itemprop="brand"]', '.product-brand'],
     // Costco now serves /p/[-/]<slug>/<numeric-id>; the older

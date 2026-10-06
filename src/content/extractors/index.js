@@ -39,7 +39,12 @@ export function extractProduct(doc = document, loc = window.location) {
   if (!config || !config.productUrl.test(loc.href)) return null;
 
   const structured = readStructuredData(doc);
-  const priceElement = findFirst(doc, config.price);
+
+  // The price element is a layout anchor, not just a value source, so it has to
+  // be the right element. Observed live on Best Buy: a loose wildcard matched an
+  // empty header component and the button was injected beside the shopping cart.
+  // Requiring the match to actually contain a price rejects that outright.
+  const priceElement = findFirst(doc, config.price, (el) => parsePrice(textOf(el)) != null);
 
   const title = structured.title || textOf(findFirst(doc, config.title));
   if (!title) return null;
@@ -163,8 +168,9 @@ function firstImage(image) {
  * Costco puts its price inside web components, where `querySelector` cannot
  * reach at all.
  */
-function findFirst(doc, selectors) {
+function findFirst(doc, selectors, accept) {
   let fallback = null;
+  const usable = (el) => !accept || accept(el);
 
   for (const selector of selectors || []) {
     let matches;
@@ -174,6 +180,7 @@ function findFirst(doc, selectors) {
       continue; // A selector a future Chrome rejects must not break extraction.
     }
     for (const el of matches) {
+      if (!usable(el)) continue;
       if (isVisible(el)) return el;
       if (!fallback) fallback = el;
     }
@@ -182,7 +189,7 @@ function findFirst(doc, selectors) {
   // Nothing visible in the light DOM -- try shadow roots before giving up.
   for (const selector of selectors || []) {
     const el = queryShadow(doc, selector);
-    if (el) return el;
+    if (el && usable(el)) return el;
   }
 
   // A hidden match still carries usable text for title or brand; only the
