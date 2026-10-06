@@ -145,3 +145,31 @@ describe('productKey — accessories', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('productKey — variant suffixes', () => {
+  it('gives one identity to a product every retailer names differently', () => {
+    // Observed live: a comparison run from Best Buy shared nothing with the
+    // same comparison run from eBay, because Best Buy appends a colour code.
+    const keys = [
+      { title: 'Sony - WH-1000XM6 Headphones - Black', brand: 'Sony', model: 'WH1000XM6/B' },
+      { title: 'Sony WH-1000XM6 Headphones', brand: 'Sony', model: 'WH-1000XM6' },
+      { title: 'Sony WH-1000XM6 Wireless Headphones', brand: 'Sony' },
+      { title: 'Sony WH-1000XM6 Wireless Headphones Black', brand: 'Sony', model: 'Sony WH-1000XM6' },
+    ].map(productKey);
+
+    expect(new Set(keys).size).toBe(1);
+    expect(keys[0]).toBe('m:WH1000XM6');
+  });
+
+  it('keeps capacity variants apart — those are in the code, not the suffix', () => {
+    const twoTb = productKey({ title: 'Samsung 990 PRO 2TB', brand: 'Samsung', model: 'MZ-V9P2T0B' });
+    const oneTb = productKey({ title: 'Samsung 990 PRO 1TB', brand: 'Samsung', model: 'MZ-V9P1T0B' });
+    expect(twoTb).not.toBe(oneTb);
+  });
+
+  it('strips a regional suffix the same way', () => {
+    const a = productKey({ title: 'Samsung 990 PRO 2TB', brand: 'Samsung', model: 'MZ-V9P2T0B/AM' });
+    const b = productKey({ title: 'Samsung 990 PRO 2TB', brand: 'Samsung', model: 'MZ-V9P2T0B' });
+    expect(a).toBe(b);
+  });
+});

@@ -159,7 +159,15 @@ function normalizeUnit(unit) {
 export function canonicalModelCode(value, brand = '') {
   if (!value || typeof value !== 'string') return null;
 
-  let code = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Drop a trailing variant code. Retailers append colour and region markers
+  // after a slash -- Best Buy reports "WH1000XM6/B" for the black one, where
+  // every other retailer reports "WH1000XM6". Keeping it split one product
+  // into two identities, so a comparison run from Best Buy shared nothing
+  // with the same comparison run from anywhere else.
+  //
+  // Capacity and generation differences never appear this way; they are part
+  // of the code itself ("MZ-V9P2T0B" versus "MZ-V9P1T0B"), so they survive.
+  let code = String(value).split('/')[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
   const brandCode = String(brand || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // Drop a leading brand, but only when what remains still looks like a model
