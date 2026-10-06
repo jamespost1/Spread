@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { retailerFromUrl, sourceRetailerFor, isSafeHttpUrl } from '../src/core/retailers.js';
+import { retailerFromUrl, sourceRetailerFor, isSafeHttpUrl, retailerSearchUrl } from '../src/core/retailers.js';
 
 describe('retailerFromUrl', () => {
   it('identifies a retailer from a full URL', () => {
@@ -56,5 +56,29 @@ describe('isSafeHttpUrl', () => {
     expect(isSafeHttpUrl('not a url')).toBe(false);
     expect(isSafeHttpUrl('')).toBe(false);
     expect(isSafeHttpUrl(null)).toBe(false);
+  });
+});
+
+describe('retailerSearchUrl', () => {
+  it('builds a search URL on the retailer’s own domain', () => {
+    const url = retailerSearchUrl('Best Buy', 'WH-1000XM5');
+    expect(url).toContain('bestbuy.com');
+    expect(url).toContain('WH-1000XM5');
+  });
+
+  it('encodes the query', () => {
+    expect(retailerSearchUrl('Target', 'Sony WH-1000XM5')).toContain('Sony%20WH-1000XM5');
+  });
+
+  it('returns null for a retailer it has no pattern for', () => {
+    expect(retailerSearchUrl('Some Random Shop', 'abc')).toBeNull();
+  });
+
+  it('returns null without a query', () => {
+    expect(retailerSearchUrl('Target', '')).toBeNull();
+  });
+
+  it('produces a safe http url', () => {
+    expect(isSafeHttpUrl(retailerSearchUrl('Walmart', 'WH1000XM5'))).toBe(true);
   });
 });

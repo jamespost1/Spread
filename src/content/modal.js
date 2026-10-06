@@ -223,6 +223,10 @@ function buildOfferTable(product, offers) {
         el('span', 'spread-offer-note', `includes ${formatPrice(offer.shipping)} shipping`)
       );
     }
+    if (offer.seller && offer.seller.toLowerCase() !== (offer.retailer || '').toLowerCase()) {
+      // A marketplace listing is not the store's own offer; say who is selling.
+      main.appendChild(el('span', 'spread-offer-note', `sold by ${offer.seller}`));
+    }
     if (offer.source === 'observed' && Number.isFinite(offer.observedAt)) {
       // Not a live quote -- be explicit rather than let it read as current.
       main.appendChild(el('span', 'spread-offer-note', `last seen ${relativeTime(offer.observedAt)}`));
@@ -238,11 +242,16 @@ function buildOfferTable(product, offers) {
     }
 
     if (isSafeHttpUrl(offer.url)) {
-      // Google Shopping often hands back a Google redirect rather than the
-      // retailer's own page. Promising "Visit store" and landing on Google is
-      // a small lie; name the destination instead.
-      const viaGoogle = /(^|\.)google\./i.test(safeHost(offer.url));
-      const link = el('a', 'spread-offer-link', viaGoogle ? 'View on Google' : 'Visit store');
+      // Name the destination honestly. Google Shopping gives no merchant URL,
+      // so most links are the retailer's own search for the model rather than
+      // a product page, and a few fall back to Google.
+      const label =
+        offer.urlKind === 'store-search'
+          ? `Find at ${offer.retailer}`
+          : /(^|\.)google\./i.test(safeHost(offer.url))
+            ? 'View on Google'
+            : 'Visit store';
+      const link = el('a', 'spread-offer-link', label);
       link.href = offer.url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';

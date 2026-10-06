@@ -16,7 +16,7 @@
 // goes through the match cascade before a shopper ever sees it.
 
 import { parsePrice } from '../../../src/core/price.js';
-import { retailerFromUrl } from '../../../src/core/retailers.js';
+import { retailerFromUrl, retailerSearchUrl } from '../../../src/core/retailers.js';
 
 const ENDPOINT = 'https://google.serper.dev/shopping';
 
@@ -75,22 +75,27 @@ function buildQuery(product) {
 function toOffer(item, product) {
   const price = parsePrice(String(item.price ?? ''));
   if (!Number.isFinite(price) || price <= 0) return null;
-  if (!item.link) return null;
 
-  // Google names the merchant; fall back to deriving it from the link.
-  const retailer = cleanMerchant(item.source) || retailerFromUrl(item.link);
-  if (!retailer) return null;
+  const { retailer, seller } = splitMerchant(item.source) ;
+  const name = retailer || (item.link ? retailerFromUrl(item.link) : null);
+  if (!name) return null;
 
   // Never offer the page the shopper is already on as an alternative.
-  if (product.retailer && retailer.toLowerCase() === product.retailer.toLowerCase()) {
+  if (product.retailer && name.toLowerCase() === product.retailer.toLowerCase()) {
     return null;
   }
 
+  // Google only ever links back to Google, so prefer the retailer's own search
+  // for the model -- it lands on the right store with the product in reach.
+  const storeSearch = retailerSearchUrl(name, product.model || product.title);
+
   return {
-    retailer,
+    retailer: name,
+    seller,
     title: item.title || '',
     price,
-    url: item.link,
+    url: storeSearch || item.link || null,
+    urlKind: storeSearch ? 'store-search' : 'google',
     imageUrl: item.imageUrl || null,
     brand: null,
     model: null,
@@ -100,12 +105,24 @@ function toOffer(item, product) {
   };
 }
 
-/** Google appends noise to merchant names: "Best Buy - Official Site". */
-function cleanMerchant(source) {
-  if (!source || typeof source !== 'string') return null;
-  const name = source
-    .split(/\s+[-–|]\s+/)[0]
-    .replace(/\.(com|net|org|co)\b.*$/i, '')
-    .trim();
-  return name.length >= 2 && name.length <= 40 ? name : null;
+/**
+ * Split "Walmart - Focus Camera" into the storefront and who is actually
+ * selling. Google uses the same separator for marketing noise ("Best Buy -
+ * Official Site"), so phrases that name no real seller are discarded rather
+ * than reported as one.
+ *
+ * This matters: a marketplace listing shown as plain "Walmart" overstates it.
+ * The price is real, but who is behind it is part of whether to trust it.
+ */
+function splitMerchant(source) {
+  if (!source || typeof source !== 'string') return { retailer: null, seller: null };
+
+  const parts = source.split(/\s+[-–|]\s+/).map((x) => x.trim()).filter(Boolean);
+  const retailer = (parts[0] || '').replace(/\.(com|net|org|co)\b.*$/i, '').trim();
+  if (retailer.length < 2 || retailer.length > 40) return { retailer: null, seller: null };
+
+  const MARKETING = /^(official\s+(site|store)|seller|store|shop|online)$/i;
+  const rest = parts.slice(1).find((x) => !MARKETING.test(x)) || null;
+
+  return { retailer, seller: rest && rest.length <= 40 ? rest : null };
 }
