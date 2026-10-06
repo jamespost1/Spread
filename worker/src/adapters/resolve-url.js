@@ -43,14 +43,41 @@ const DOMAINS = {
 };
 
 /**
+ * Product URL shapes for retailers Spread does not extract from, and so has no
+ * pattern for in the selector table.
+ */
+const EXTRA_PRODUCT_URLS = {
+  "Macy's": /\/shop\/product\//i,
+  Newegg: /\/p\/[A-Z0-9]/i,
+  "Kohl's": /\/product\//i,
+  'B&H Photo': /\/c\/product\//i,
+  'Home Depot': /\/p\//i,
+  "Lowe's": /\/pd\//i,
+  Wayfair: /\/pdp\/|-[a-z0-9]{8,}\.html/i,
+  Staples: /\/product[_-]/i,
+  GameStop: /\/products\//i,
+  Chewy: /\/dp\//i,
+  REI: /\/product\//i,
+  Nordstrom: /\/s\//i,
+  Overstock: /\/product\//i,
+  Zappos: /\/p\//i,
+};
+
+/**
  * Generic shapes that mark a URL as a product page at retailers we have no
  * specific pattern for. Deliberately conservative: a false positive sends the
  * shopper somewhere irrelevant, which is worse than falling back to a search.
  */
 const GENERIC_PRODUCT_URL = /\/(p|ip|dp|product|products|item|pd)\/|\/[a-z0-9-]{8,}\/?$/i;
 
-/** Pages that are definitely not a listing, whatever else they look like. */
-const NOT_A_PRODUCT = /\/(search|s|browse|category|c|shop|deals|b|sb)\b|[?&](q|query|keyword|searchTerm)=/i;
+/**
+ * Pages that are definitely not a listing.
+ *
+ * Deliberately narrow. An earlier version rejected any path containing
+ * "/shop", which threw away every Macy's product page -- they live at
+ * /shop/product/... -- so only unambiguous search and browse markers count.
+ */
+const NOT_A_PRODUCT = /\/(search|browse|category|catalogsearch)\b|[?&](q|query|keyword|searchTerm|searchText)=/i;
 
 /**
  * Find the product page for one offer.
@@ -67,6 +94,12 @@ const NOT_A_PRODUCT = /\/(search|s|browse|category|c|shop|deals|b|sb)\b|[?&](q|q
 export async function resolveProductUrl(retailer, query, apiKey, kv) {
   const domain = DOMAINS[retailer];
   if (!domain || !query || !apiKey) return null;
+
+  // Retailers append variant suffixes to the model -- Best Buy reports
+  // "WH1000XM6/B" for the black one. No one indexes that string, so searching
+  // for it finds nothing. The part before the slash is the real model number.
+  query = String(query).split('/')[0].trim();
+  if (!query) return null;
 
   const cacheKey = `url:${domain}:${String(query).toLowerCase().replace(/\s+/g, '-').slice(0, 80)}`;
 
@@ -96,7 +129,7 @@ export async function resolveProductUrl(retailer, query, apiKey, kv) {
 
 /** First organic result on the right domain that looks like a listing. */
 function pickProductUrl(results, domain, retailer) {
-  const pattern = SELECTORS[retailer]?.productUrl;
+  const pattern = SELECTORS[retailer]?.productUrl || EXTRA_PRODUCT_URLS[retailer];
 
   for (const result of results) {
     const link = result?.link;

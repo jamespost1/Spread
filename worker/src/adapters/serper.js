@@ -27,7 +27,7 @@ const ENDPOINT = 'https://google.serper.dev/shopping';
  * @param {string} apiKey Serper API key.
  * @returns {Promise<object[]>} Offer candidates.
  */
-export async function searchShopping(product, apiKey) {
+export async function searchShopping(product, apiKey, { includeMarketplace = false } = {}) {
   if (!apiKey) return [];
 
   const query = buildQuery(product);
@@ -45,7 +45,7 @@ export async function searchShopping(product, apiKey) {
 
   const data = await response.json();
   return (data.shopping || [])
-    .map((item) => toOffer(item, product))
+    .map((item) => toOffer(item, product, includeMarketplace))
     .filter(Boolean);
 }
 
@@ -72,7 +72,7 @@ function buildQuery(product) {
   return parts.join(' ').trim().slice(0, 120) || null;
 }
 
-function toOffer(item, product) {
+function toOffer(item, product, includeMarketplace) {
   const price = parsePrice(String(item.price ?? ''));
   if (!Number.isFinite(price) || price <= 0) return null;
 
@@ -94,6 +94,13 @@ function toOffer(item, product) {
   // not find a marketplace seller's listing, and for those the Google product
   // page is the only destination that names the seller and links to a purchase.
   const marketplace = Boolean(seller) && seller.toLowerCase() !== name.toLowerCase();
+
+  // A third-party listing is excluded by default, and the reasons compound:
+  // the price cannot be verified, the seller is not the retailer whose name
+  // would be displayed, and there is no page that shows that specific offer --
+  // the store's own product page shows the store's own price, which is a
+  // different number than the one quoted. Set INCLUDE_MARKETPLACE to allow it.
+  if (marketplace && !includeMarketplace) return null;
   const productPage = item.productId
     ? `https://www.google.com/shopping/product/${encodeURIComponent(item.productId)}`
     : null;

@@ -92,7 +92,11 @@ async function handleCompare(request, env, ctx) {
       { clientId: env.EBAY_CLIENT_ID, clientSecret: env.EBAY_CLIENT_SECRET },
       env.SPREAD_KV
     ),
-    shoppingAllowed ? searchShopping(product, env.SERPER_API_KEY) : Promise.resolve([]),
+    shoppingAllowed
+      ? searchShopping(product, env.SERPER_API_KEY, {
+          includeMarketplace: env.INCLUDE_MARKETPLACE === 'true',
+        })
+      : Promise.resolve([]),
   ]);
 
   const sources = {
