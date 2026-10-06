@@ -13,5 +13,6 @@
   },
   "devDependencies": {
     "wrangler": "^3.99.0"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }

@@ -6,7 +6,7 @@
 [![Tests](https://img.shields.io/badge/tests-210%20passing-0b6b3a)](tests/)
 [![Match precision](https://img.shields.io/badge/match%20precision-100%25-0b6b3a)](evals/)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 Spread is a Chrome extension that puts a **Check price** button on product pages at Amazon,
 Target, Walmart, Best Buy, eBay and Costco. It records what things cost as you browse, so when you
@@ -269,4 +269,12 @@ in `worker/src/adapters/`.
 
 ## License
 
-MIT
+[GNU AGPL-3.0](LICENSE).
+
+You may use, modify and self-host this freely. If you distribute a modified
+version, or run one as a network service, you have to publish your source under
+the same licence -- that network clause is the point, given this project is a
+browser extension backed by a hosted API.
+
+Copyright © 2026 James Post. As the copyright holder I am not bound by the
+copyleft, so get in touch if you want it under different terms.
