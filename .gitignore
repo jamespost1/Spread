@@ -5,3 +5,14 @@ coverage/
 .DS_Store
 .wrangler/
 .dev.vars
+.env
+
+# Secrets -- never commit. .env was committed once by a broad `git add -A`;
+# .gitignore does not protect a file that is already tracked, so the patterns
+# below are a backstop, not a guarantee. Stage files by name.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
