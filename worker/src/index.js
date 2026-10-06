@@ -96,20 +96,22 @@ async function handleCompare(request, env, ctx) {
       ? searchShopping(product, env.SERPER_API_KEY, {
           includeMarketplace: env.INCLUDE_MARKETPLACE === 'true',
         })
-      : Promise.resolve([]),
+      : Promise.resolve({ returned: 0, offers: [] }),
   ]);
 
   const sources = {
     bestbuy: settledStatus(bestBuy),
     ebay: settledStatus(ebay),
     shopping: shoppingAllowed
-      ? settledStatus(shopping)
+      ? shopping.status === 'fulfilled'
+        ? { ok: true, returned: shopping.value.returned, count: shopping.value.offers.length }
+        : settledStatus(shopping)
       : { ok: false, error: env.SERPER_API_KEY ? 'daily-cap-reached' : 'not-configured' },
   };
   const candidates = [
     ...settledValue(bestBuy),
     ...settledValue(ebay),
-    ...settledValue(shopping),
+    ...(shopping.status === 'fulfilled' ? shopping.value.offers : []),
   ];
 
   // --- Stage 1: deterministic ---------------------------------------------
@@ -229,7 +231,9 @@ async function resolveTopUrls(offers, product, env) {
 
   await Promise.all(
     targets.map(async (offer) => {
-      const url = await resolveProductUrl(offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV);
+      const url = await resolveProductUrl(
+        offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV, product.title
+      );
       if (url) {
         offer.url = url;
         offer.urlKind = 'product-page';

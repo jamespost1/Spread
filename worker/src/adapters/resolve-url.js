@@ -15,6 +15,27 @@
 
 import { SELECTORS } from '../../../src/content/extractors/selectors.js';
 
+/**
+ * Colours that commonly appear in a product slug.
+ *
+ * The variant suffix has to be stripped from the search -- no retailer indexes
+ * "WH1000XM6/B" -- but that also discards which colour the shopper is looking
+ * at, and Google will return whichever variant it ranks first. Landing a
+ * black-headphones comparison on the pink listing is the wrong product, at a
+ * possibly different price.
+ */
+const COLOURS = [
+  'black', 'white', 'silver', 'blue', 'red', 'green', 'pink', 'purple',
+  'gold', 'grey', 'gray', 'beige', 'brown', 'navy', 'midnight', 'platinum',
+  'graphite', 'sand', 'cream', 'ivory', 'titanium',
+];
+
+/** The colour named in a title or URL, if any. */
+function colourOf(text) {
+  const haystack = String(text || '').toLowerCase();
+  return COLOURS.find((c) => new RegExp(`\\b${c}\\b`).test(haystack)) || null;
+}
+
 const SEARCH_ENDPOINT = 'https://google.serper.dev/search';
 const URL_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -91,9 +112,11 @@ const NOT_A_PRODUCT = /\/(search|browse|category|catalogsearch)\b|[?&](q|query|k
  * @param {KVNamespace} kv
  * @returns {Promise<string|null>}
  */
-export async function resolveProductUrl(retailer, query, apiKey, kv) {
+export async function resolveProductUrl(retailer, query, apiKey, kv, sourceTitle = '') {
   const domain = DOMAINS[retailer];
   if (!domain || !query || !apiKey) return null;
+
+  const wantColour = colourOf(sourceTitle);
 
   // Retailers append variant suffixes to the model -- Best Buy reports
   // "WH1000XM6/B" for the black one. No one indexes that string, so searching
@@ -101,7 +124,7 @@ export async function resolveProductUrl(retailer, query, apiKey, kv) {
   query = String(query).split('/')[0].trim();
   if (!query) return null;
 
-  const cacheKey = `url:${domain}:${String(query).toLowerCase().replace(/\s+/g, '-').slice(0, 80)}`;
+  const cacheKey = `url:${domain}:${String(query).toLowerCase().replace(/\s+/g, '-').slice(0, 80)}${wantColour ? `:${wantColour}` : ''}`;
 
   const cached = await kv.get(cacheKey);
   // An empty string is a cached "looked, found nothing" -- honour it rather
@@ -117,7 +140,7 @@ export async function resolveProductUrl(retailer, query, apiKey, kv) {
     });
     if (response.ok) {
       const data = await response.json();
-      found = pickProductUrl(data.organic || [], domain, retailer);
+      found = pickProductUrl(data.organic || [], domain, retailer, wantColour);
     }
   } catch {
     return null; // Leave the cache alone so a transient failure can retry.
@@ -127,8 +150,22 @@ export async function resolveProductUrl(retailer, query, apiKey, kv) {
   return found;
 }
 
-/** First organic result on the right domain that looks like a listing. */
-function pickProductUrl(results, domain, retailer) {
+/**
+ * First organic result on the right domain that looks like a listing.
+ *
+ * Runs twice when a colour is known: once rejecting any URL that names a
+ * different colour, then again without that constraint, so a colour mismatch
+ * costs ranking rather than losing the offer entirely.
+ */
+function pickProductUrl(results, domain, retailer, wantColour) {
+  if (wantColour) {
+    const exact = scan(results, domain, retailer, wantColour);
+    if (exact) return exact;
+  }
+  return scan(results, domain, retailer, null);
+}
+
+function scan(results, domain, retailer, wantColour) {
   const pattern = SELECTORS[retailer]?.productUrl || EXTRA_PRODUCT_URLS[retailer];
 
   for (const result of results) {
@@ -143,6 +180,12 @@ function pickProductUrl(results, domain, retailer) {
     }
     if (host !== domain && !host.endsWith(`.${domain}`)) continue;
     if (NOT_A_PRODUCT.test(link)) continue;
+
+    if (wantColour) {
+      const linkColour = colourOf(link);
+      // A URL naming no colour is fine; one naming a different colour is not.
+      if (linkColour && linkColour !== wantColour) continue;
+    }
 
     // Prefer the retailer's own known product URL shape where we have one --
     // those patterns already drive extraction, so they are well tested.

@@ -28,10 +28,10 @@ const ENDPOINT = 'https://google.serper.dev/shopping';
  * @returns {Promise<object[]>} Offer candidates.
  */
 export async function searchShopping(product, apiKey, { includeMarketplace = false } = {}) {
-  if (!apiKey) return [];
+  if (!apiKey) return { returned: 0, offers: [] };
 
   const query = buildQuery(product);
-  if (!query) return [];
+  if (!query) return { returned: 0, offers: [] };
 
   const response = await fetch(ENDPOINT, {
     method: 'POST',
@@ -44,9 +44,14 @@ export async function searchShopping(product, apiKey, { includeMarketplace = fal
   }
 
   const data = await response.json();
-  return (data.shopping || [])
-    .map((item) => toOffer(item, product, includeMarketplace))
-    .filter(Boolean);
+  const raw = data.shopping || [];
+  return {
+    // The pre-filter count matters: without it there is no way to tell a thin
+    // result ("Google found little") from an over-aggressive filter ("Google
+    // found plenty and we threw it away"), and those need opposite fixes.
+    returned: raw.length,
+    offers: raw.map((item) => toOffer(item, product, includeMarketplace)).filter(Boolean),
+  };
 }
 
 /**
@@ -59,7 +64,13 @@ export async function searchShopping(product, apiKey, { includeMarketplace = fal
 function buildQuery(product) {
   const parts = [];
   if (product.brand) parts.push(product.brand);
-  if (product.model) parts.push(product.model);
+
+  // Strip the variant suffix retailers append to a model. Best Buy reports
+  // "WH1000XM6/B" for the black one, and searching that string returns almost
+  // nothing -- one merchant instead of the whole market -- because no listing
+  // is indexed under it.
+  const model = String(product.model || '').split('/')[0].trim();
+  if (model) parts.push(model);
 
   if (parts.length < 2 && product.title) {
     const words = product.title
