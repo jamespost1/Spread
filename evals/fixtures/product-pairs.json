@@ -321,6 +321,52 @@
         "price": 39.99
       },
       "label": "different"
+    },
+    {
+      "id": "accessory-for-product",
+      "note": "Accessory listings carry the product's own model code.",
+      "source": {
+        "title": "Sony WH-1000XM5 Wireless Noise Canceling Headphones",
+        "brand": "Sony",
+        "model": "WH-1000XM5",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Carrying Case for Sony WH-1000XM5",
+        "price": 12.99
+      },
+      "label": "different"
+    },
+    {
+      "id": "refurb-with-matching-model",
+      "note": "Condition must outrank an exact model-code match.",
+      "source": {
+        "title": "Sony WH-1000XM5 Headphones",
+        "brand": "Sony",
+        "model": "WH-1000XM5",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Sony WH-1000XM5 Refurbished",
+        "brand": "Sony",
+        "model": "WH-1000XM5",
+        "price": 229.0
+      },
+      "label": "different"
+    },
+    {
+      "id": "replacement-part",
+      "note": "Spare parts name the model they fit.",
+      "source": {
+        "title": "Sony WH-1000XM5 Wireless Headphones",
+        "brand": "Sony",
+        "price": 349.99
+      },
+      "candidate": {
+        "title": "Replacement Ear Pads for Sony WH-1000XM5",
+        "price": 9.99
+      },
+      "label": "different"
     }
   ]
 }

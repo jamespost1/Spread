@@ -26,8 +26,22 @@ export function dailyLimitFrom(env) {
 }
 
 /** Key for today's counter, in UTC to match the KV limit reset. */
-function todayKey() {
-  return `budget:${new Date().toISOString().slice(0, 10)}`;
+function todayKey(scope = 'adjudication') {
+  return `budget:${scope}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Daily cap for Google Shopping lookups.
+ *
+ * Serper's free allowance is a fixed grant rather than a monthly reset, so an
+ * unbounded burst would quietly consume it. The default keeps a month of
+ * normal use inside the free tier; raise it deliberately.
+ */
+export function shoppingLimitFrom(env) {
+  const configured = env?.SHOPPING_DAILY_LIMIT;
+  if (configured === undefined || configured === null || configured === '') return 60;
+  const value = Number(configured);
+  return Number.isFinite(value) && value >= 0 ? value : 60;
 }
 
 /**
@@ -36,8 +50,8 @@ function todayKey() {
  * @param {number} dailyLimit Maximum adjudication calls per UTC day.
  * @returns {Promise<{allowed: boolean, used: number, limit: number}>}
  */
-export async function reserveCall(kv, dailyLimit) {
-  const key = todayKey();
+export async function reserveCall(kv, dailyLimit, scope = 'adjudication') {
+  const key = todayKey(scope);
   const used = Number((await kv.get(key)) || 0);
 
   if (used >= dailyLimit) {
@@ -58,7 +72,7 @@ export async function reserveCall(kv, dailyLimit) {
  * @param {KVNamespace} kv
  * @param {number} dailyLimit
  */
-export async function budgetStatus(kv, dailyLimit) {
-  const used = Number((await kv.get(todayKey())) || 0);
+export async function budgetStatus(kv, dailyLimit, scope = 'adjudication') {
+  const used = Number((await kv.get(todayKey(scope))) || 0);
   return { used, limit: dailyLimit, remaining: Math.max(0, dailyLimit - used) };
 }

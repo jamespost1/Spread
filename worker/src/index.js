@@ -14,8 +14,9 @@ import { partitionCandidates, VERDICT } from '../../src/core/matching.js';
 import { productKey, keyStrength } from '../../src/core/product-key.js';
 import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
+import { searchShopping } from './adapters/serper.js';
 import { adjudicate } from './adjudicator.js';
-import { budgetStatus, dailyLimitFrom } from './budget.js';
+import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
 import { handleChallenge, handleNotification } from './ebay-compliance.js';
 import { recordObservation, observedOffers } from './history.js';
@@ -75,21 +76,36 @@ async function handleCompare(request, env, ctx) {
     return json({ ...cached, cached: true });
   }
 
-  // --- Fan out to every retailer we can price ------------------------------
-  const [bestBuy, ebay] = await Promise.allSettled([
+  // --- Fan out to every price source we have -------------------------------
+  // Google Shopping is the broad one; the first-party APIs are narrower but
+  // more precise. A capped reservation runs first so a burst cannot consume
+  // the Shopping allowance.
+  const shoppingAllowed =
+    Boolean(env.SERPER_API_KEY) &&
+    (await reserveCall(env.SPREAD_KV, shoppingLimitFrom(env), 'shopping')).allowed;
+
+  const [bestBuy, ebay, shopping] = await Promise.allSettled([
     searchBestBuy(product, env.BESTBUY_API_KEY),
     searchEbay(
       product,
       { clientId: env.EBAY_CLIENT_ID, clientSecret: env.EBAY_CLIENT_SECRET },
       env.SPREAD_KV
     ),
+    shoppingAllowed ? searchShopping(product, env.SERPER_API_KEY) : Promise.resolve([]),
   ]);
 
   const sources = {
     bestbuy: settledStatus(bestBuy),
     ebay: settledStatus(ebay),
+    shopping: shoppingAllowed
+      ? settledStatus(shopping)
+      : { ok: false, error: env.SERPER_API_KEY ? 'daily-cap-reached' : 'not-configured' },
   };
-  const candidates = [...settledValue(bestBuy), ...settledValue(ebay)];
+  const candidates = [
+    ...settledValue(bestBuy),
+    ...settledValue(ebay),
+    ...settledValue(shopping),
+  ];
 
   // --- Stage 1: deterministic ---------------------------------------------
   const { resolved, ambiguous } = partitionCandidates(product, candidates);
@@ -213,7 +229,9 @@ async function health(env) {
     retailers: {
       bestbuy: Boolean(env.BESTBUY_API_KEY),
       ebay: Boolean(env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET),
+      shopping: Boolean(env.SERPER_API_KEY),
     },
+    shopping: await budgetStatus(env.SPREAD_KV, shoppingLimitFrom(env), 'shopping'),
   };
 }
 

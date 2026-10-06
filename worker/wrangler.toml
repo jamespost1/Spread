@@ -9,6 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 # batched call, 200 is about $0.34/day worst case -- and the verdict cache means
 # real usage sits far below the cap. Raise deliberately.
 ADJUDICATION_DAILY_LIMIT = "200"
+# Google Shopping lookups per UTC day. Serper's free allowance is a fixed grant
+# rather than a monthly reset, so this keeps a burst from consuming it. At 60/day
+# a month of normal use stays inside the free 2,500.
+SHOPPING_DAILY_LIMIT = "60"
 ADJUDICATOR_MODEL = "claude-haiku-4-5"
 # Set to chrome-extension://<published-id> after the first Web Store release.
 ALLOWED_ORIGIN = "*"
@@ -19,6 +23,8 @@ binding = "SPREAD_KV"
 id = "bcc63dff6dbd4d0a958215a26646f860"
 
 # Secrets -- set with `wrangler secret put <NAME>`, never committed:
+#   SERPER_API_KEY       https://serper.dev/ (Google Shopping; 2,500 free, then
+#                        ~$0.001/query -- the broad-coverage price source)
 #   BESTBUY_API_KEY      https://developer.bestbuy.com/
 #   EBAY_CLIENT_ID       https://developer.ebay.com/ (Browse API keyset)
 #   EBAY_CLIENT_SECRET

@@ -44,6 +44,27 @@ const DISQUALIFIERS = [
 ];
 
 /**
+ * Listings for something that goes *with* the product rather than the product.
+ *
+ * These are the hardest false positives in the set, because an accessory
+ * listing names the model it fits -- "Carrying Case for WH-1000XM5" carries the
+ * exact code that is otherwise the strongest same-product signal there is.
+ */
+const ACCESSORY = new RegExp(
+  '\\b(' +
+    'case|cover|sleeve|pouch|skin|shell|bag|' +
+    'screen protector|protector|charger|charging (?:cable|dock|stand)|cable|cord|adapter|' +
+    'mount|stand|holder|strap|band|clip|' +
+    'ear ?(?:tips|pads|cushions|hooks)|tips|pads|cushions|' +
+    'replacement parts?|spare|accessor(?:y|ies)' +
+  ')\\b[^.]{0,30}\\b(?:for|compatible with|fits)\\b',
+  'i'
+);
+
+/** Also an accessory, stated the other way round. */
+const ACCESSORY_PREFIX = /\b(?:compatible with|designed for|fits)\b/i;
+
+/**
  * Blend weights for the fuzzy path, used only when no decisive signal fires.
  * They sum to 1.
  */
@@ -69,6 +90,19 @@ export function compareProducts(source, candidate) {
 
   if (a === b) {
     return result(1, VERDICT.SAME, true, { reason: 'exact-title' });
+  }
+
+  // --- Veto checks, before any positive signal. ----------------------------
+  // These must outrank model matching rather than follow it. A refurbished
+  // unit and an accessory both carry the product's own model code, so a code
+  // match would otherwise confirm them as the same purchasable item -- and
+  // quote a $12.99 carrying case as the price of a $349 pair of headphones.
+  const disqualifier = findDisqualifier(a, b);
+  if (disqualifier) {
+    return result(0.2, VERDICT.DIFFERENT, true, { reason: 'condition-mismatch', disqualifier });
+  }
+  if (isAccessoryFor(candidateTitle, sourceTitle)) {
+    return result(0.1, VERDICT.DIFFERENT, true, { reason: 'accessory' });
   }
 
   // --- Decisive signal 1: explicit model/SKU fields agree. -----------------
@@ -99,12 +133,6 @@ export function compareProducts(source, candidate) {
   const brandB = normalizeTitle(candidate?.brand || '');
   if (brandA && brandB && brandA !== brandB) {
     return result(0.15, VERDICT.DIFFERENT, true, { reason: 'brand-conflict', brandA, brandB });
-  }
-
-  // --- Decisive signal 4: one side is refurbished / a bundle / open box. ---
-  const disqualifier = findDisqualifier(a, b);
-  if (disqualifier) {
-    return result(0.25, VERDICT.DIFFERENT, true, { reason: 'condition-mismatch', disqualifier });
   }
 
   // --- Fuzzy path ----------------------------------------------------------
@@ -216,6 +244,21 @@ function findSharedCode(codesA, codesB) {
     }
   }
   return null;
+}
+
+/**
+ * True when the candidate is an accessory for the source product.
+ *
+ * Only one direction matters: a case listed against headphones is a different
+ * product, but headphones listed against a case is the same mismatch and is
+ * caught when that page is the source.
+ */
+function isAccessoryFor(candidateTitle, sourceTitle) {
+  const candidate = String(candidateTitle || '');
+  const source = String(sourceTitle || '');
+  const accessoryish = (t) => ACCESSORY.test(t) || ACCESSORY_PREFIX.test(t);
+  // If the source is itself an accessory, these are peers, not product vs part.
+  return accessoryish(candidate) && !accessoryish(source);
 }
 
 /** A condition/bundle marker present on exactly one side. */

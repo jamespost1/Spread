@@ -139,6 +139,44 @@ describe('compareProducts — the precision invariant', () => {
     expect(r.signals.reason).not.toBe('model-in-title');
   });
 
+  it('rejects an accessory that names the product it fits', () => {
+    // The hardest false positive in the set: an accessory listing carries the
+    // exact model code that is otherwise the strongest same-product signal,
+    // so a code match would quote a $12.99 case as the price of $349 headphones.
+    for (const title of [
+      'Carrying Case for WH-1000XM5',
+      'Hard Shell Travel Case Compatible with Sony WH1000XM5',
+      'Replacement Ear Pads for Sony WH-1000XM5',
+      'Charging Cable for Sony WH-1000XM5',
+    ]) {
+      const r = compareProducts(
+        { title: 'Sony WH-1000XM5 Wireless Noise Canceling Headphones', brand: 'Sony', model: 'WH-1000XM5' },
+        { title, price: 12.99 }
+      );
+      expect(r.verdict, title).toBe(VERDICT.DIFFERENT);
+      expect(r.confident).toBe(true);
+    }
+  });
+
+  it('rejects refurbished even when the model code matches exactly', () => {
+    // Condition must outrank the model signal, not follow it.
+    const r = compareProducts(
+      { title: 'Sony WH-1000XM5 Headphones', brand: 'Sony', model: 'WH-1000XM5' },
+      { title: 'Sony WH-1000XM5 Refurbished', brand: 'Sony', model: 'WH-1000XM5' }
+    );
+    expect(r.verdict).toBe(VERDICT.DIFFERENT);
+    expect(r.signals.reason).toBe('condition-mismatch');
+  });
+
+  it('still matches a genuine case listing against another case', () => {
+    // Two accessories are peers; the veto is product-versus-part only.
+    const r = compareProducts(
+      { title: 'Hard Case for Sony WH-1000XM5', brand: 'Geekria' },
+      { title: 'Hard Shell Case for Sony WH-1000XM5', brand: 'Geekria' }
+    );
+    expect(r.verdict).not.toBe(VERDICT.DIFFERENT);
+  });
+
   it('rejects a bundle against the standalone item', () => {
     const r = compareProducts(
       { title: 'Instant Pot Duo 6 Quart', brand: 'Instant Pot' },
