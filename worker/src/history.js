@@ -44,11 +44,30 @@ export async function recordObservation(kv, key, observation) {
     r: observation.retailer,
     p: observation.price,
     t: now,
+    // The page the price was read from. Product-level, no user identifier --
+    // the same fact as the price itself, and without it an observed offer can
+    // be shown but not visited.
+    u: observation.url || undefined,
   };
 
-  if (isRedundant(history.points, point, now)) {
-    // Nothing has changed. Return what we know without spending a write.
+  // A URL arriving for a point we already have is worth a write even when the
+  // price is unchanged -- it is the difference between an offer that can be
+  // visited and one that can only be read.
+  const learnedUrl = point.u ? backfillUrl(history.points, point) : false;
+
+  if (isRedundant(history.points, point, now) && !learnedUrl) {
+    // Nothing new. Return what we know without spending a write.
     return { summary: summarize(history.points, observation, now), wrote: false };
+  }
+
+  if (learnedUrl && isRedundant(history.points, point, now)) {
+    // Persist the URL without adding a duplicate price point.
+    await kv.put(
+      `history:${key}`,
+      JSON.stringify({ points: history.points, updatedAt: now }),
+      { expirationTtl: HISTORY_TTL_SECONDS }
+    );
+    return { summary: summarize(history.points, observation, now), wrote: true };
   }
 
   const points = prune([...history.points, point], now);
@@ -112,9 +131,10 @@ export async function observedOffers(kv, key, currentRetailer) {
     price: point.p,
     observedAt: point.t,
     source: 'observed',
-    // Deliberately no URL: the price was seen on a page we did not record,
-    // so link to nothing rather than to a guess.
-    url: null,
+    url: point.u || null,
+    urlKind: point.u ? 'product-page' : null,
+    // Read off the page itself, so it needs no further verification.
+    priceSource: 'observed-on-page',
   }));
 }
 
@@ -153,6 +173,21 @@ function summarize(points, current, now = Date.now()) {
     dropFromHighest:
       highest > lowest ? Math.round((highest - current.price) * 100) / 100 : 0,
   };
+}
+
+/**
+ * Attach a newly-known URL to existing points for the same retailer.
+ * @returns {boolean} Whether anything was actually filled in.
+ */
+function backfillUrl(points, candidate) {
+  let changed = false;
+  for (const p of points) {
+    if (p && p.r === candidate.r && !p.u) {
+      p.u = candidate.u;
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 /** True when this observation adds nothing the series does not already say. */

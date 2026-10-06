@@ -190,3 +190,43 @@ describe('observedOffers', () => {
     expect(await observedOffers(fakeKV(), 'nope', 'Amazon')).toEqual([]);
   });
 });
+
+describe('observation URLs', () => {
+  it('stores the page a price was read from', async () => {
+    const kv = fakeKV();
+    await recordObservation(kv, 'k', {
+      retailer: 'eBay',
+      price: 374.99,
+      url: 'https://www.ebay.com/itm/377169518813',
+    });
+    const [offer] = await observedOffers(kv, 'k', 'Amazon');
+    expect(offer.url).toBe('https://www.ebay.com/itm/377169518813');
+    expect(offer.urlKind).toBe('product-page');
+  });
+
+  it('backfills a URL onto an earlier linkless observation', async () => {
+    // Observations recorded before URLs were stored should become clickable
+    // the next time the same page is seen, even at an unchanged price.
+    const kv = fakeKV();
+    await seed(kv, 'k', [{ r: 'eBay', p: 374.99, agoMs: 60 * 60 * 1000 }]);
+
+    const { wrote } = await recordObservation(kv, 'k', {
+      retailer: 'eBay',
+      price: 374.99,
+      url: 'https://www.ebay.com/itm/377169518813',
+    });
+
+    expect(wrote).toBe(true);
+    const [offer] = await observedOffers(kv, 'k', 'Amazon');
+    expect(offer.url).toBe('https://www.ebay.com/itm/377169518813');
+  });
+
+  it('still skips the write when nothing at all is new', async () => {
+    const kv = fakeKV();
+    await recordObservation(kv, 'k', { retailer: 'eBay', price: 374.99, url: 'https://x/1' });
+    const { wrote } = await recordObservation(kv, 'k', {
+      retailer: 'eBay', price: 374.99, url: 'https://x/1',
+    });
+    expect(wrote).toBe(false);
+  });
+});

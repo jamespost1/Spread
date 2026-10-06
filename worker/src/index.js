@@ -72,10 +72,17 @@ async function handleCompare(request, env, ctx) {
     return json({ error: 'rate_limited' }, 429);
   }
 
-  const cacheKey = hashKey(product.retailer || '', product.title, product.model || '');
+  // Keyed on product identity, deliberately not on which retailer the shopper
+  // happens to be viewing. The same headphones should yield the same offers
+  // from Amazon as from Best Buy -- a per-retailer key made the answer depend
+  // on where the question was asked, and did the same upstream work twice.
+  // The source retailer is removed when serving instead.
+  const identity = productKey(product);
+  const cacheKey = identity || hashKey(product.title, product.model || '');
+
   const cached = await getOffers(env.SPREAD_KV, cacheKey);
   if (cached) {
-    return json({ ...cached, cached: true });
+    return json({ ...cached, offers: withoutSource(cached.offers, product.retailer), cached: true });
   }
 
   // --- Fan out to every price source we have -------------------------------
@@ -179,7 +186,7 @@ async function handleCompare(request, env, ctx) {
   if (anySourceLive) {
     ctx.waitUntil(putOffers(env.SPREAD_KV, cacheKey, payload));
   }
-  return json({ ...payload, cached: false });
+  return json({ ...payload, offers: withoutSource(payload.offers, product.retailer), cached: false });
 }
 
 /**
@@ -213,13 +220,21 @@ async function handleObserve(request, env) {
   const { summary, wrote } = await recordObservation(env.SPREAD_KV, key, {
     retailer: product.retailer,
     price: product.price,
+    url: typeof product.url === 'string' ? product.url.slice(0, 400) : null,
   });
 
   return json({ recorded: wrote, history: summary });
 }
 
+/** Never offer the shopper the page they are already looking at. */
+function withoutSource(offers, sourceRetailer) {
+  if (!sourceRetailer) return offers || [];
+  const source = sourceRetailer.toLowerCase();
+  return (offers || []).filter((o) => (o.retailer || '').toLowerCase() !== source);
+}
+
 /** How many offers are resolved and price-checked per comparison. */
-const RESOLVE_TOP_N = 4;
+const RESOLVE_TOP_N = 6;
 
 /**
  * Replace each offer's price with the one on the page it links to.

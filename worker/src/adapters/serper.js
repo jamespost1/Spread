@@ -14,6 +14,10 @@
 // Results are candidates, not answers. Google Shopping happily returns
 // accessories, bundles and adjacent models for any query, so everything here
 // goes through the match cascade before a shopper ever sees it.
+//
+// The retailer the shopper is currently on is deliberately NOT filtered here.
+// Results are cached per product rather than per source retailer, so the set
+// has to be complete; the current retailer is removed when serving.
 
 import { parsePrice } from '../../../src/core/price.js';
 import { retailerFromUrl, retailerSearchUrl, isKnownRetailer } from '../../../src/core/retailers.js';
@@ -94,11 +98,6 @@ function toOffer(item, product, includeMarketplace) {
   // Quote only retailers a shopper would recognise and can reach. The long
   // tail Google returns is mostly unreachable or not the same goods.
   if (!isKnownRetailer(name)) return null;
-
-  // Never offer the page the shopper is already on as an alternative.
-  if (product.retailer && name.toLowerCase() === product.retailer.toLowerCase()) {
-    return null;
-  }
 
   // Serper exposes no merchant URL, so route to wherever the offer is actually
   // reachable. A retailer's own search finds its own stock reliably; it will
