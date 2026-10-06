@@ -40,12 +40,12 @@ describe('chooseHeadline — priority order', () => {
   it('falls back to comparisons when there is no history yet', () => {
     const h = chooseHeadline(at(299.99), [{ retailer: 'eBay', price: 320 }], null);
     expect(h.kind).toBe('best-available');
-    expect(h.detail).toContain('1 other listing');
+    expect(h.detail).toContain('1 other retailer');
   });
 
   it('pluralizes the listing count', () => {
     const h = chooseHeadline(at(299), [{ price: 320 }, { price: 340 }], null);
-    expect(h.detail).toContain('2 other listings');
+    expect(h.detail).toContain('2 other retailers');
   });
 });
 

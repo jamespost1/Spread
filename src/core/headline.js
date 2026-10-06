@@ -85,7 +85,10 @@ export function chooseHeadline(product, sameOffers = [], history = null, carried
       kind: 'best-available',
       tone: 'good',
       title: 'Best price available',
-      detail: `Checked ${sameOffers.length} other listing${sameOffers.length === 1 ? '' : 's'}. Nothing cheaper.`,
+      // Counts retailers, not listings -- the footer reports listings
+      // considered, and two different counts of "listings" on one panel reads
+      // as a contradiction even though both are true.
+      detail: `Nothing cheaper at ${sameOffers.length} other retailer${sameOffers.length === 1 ? '' : 's'}.`,
     };
   }
 
