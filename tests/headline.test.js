@@ -92,3 +92,31 @@ describe('chooseHeadline — tone', () => {
     }
   });
 });
+
+describe('chooseHeadline — carried retailers', () => {
+  it('reports retailers found even when none could be priced', () => {
+    // Previously said "Now tracking this price", which reads as a failed
+    // lookup when the panel is in fact listing retailers right below it.
+    const h = chooseHeadline(at(378), [], null, 2);
+    expect(h.kind).toBe('carried-only');
+    expect(h.title).toBe('Also sold at 2 other retailers');
+  });
+
+  it('uses the singular for one retailer', () => {
+    expect(chooseHeadline(at(378), [], null, 1).title).toBe('Also sold at 1 other retailer');
+  });
+
+  it('still prefers a priced offer over a carried count', () => {
+    const h = chooseHeadline(at(378), [{ retailer: 'Target', price: 349 }], null, 3);
+    expect(h.kind).toBe('cheaper-elsewhere');
+  });
+
+  it('still prefers price history over a carried count', () => {
+    const h = chooseHeadline(at(299), [], hist({ isLowest: true, lowest: 299, highest: 399 }), 3);
+    expect(h.kind).toBe('lowest-ever');
+  });
+
+  it('falls back to tracking when nothing at all was found', () => {
+    expect(chooseHeadline(at(378), [], null, 0).kind).toBe('now-tracking');
+  });
+});

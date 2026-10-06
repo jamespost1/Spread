@@ -124,7 +124,7 @@ function renderResults(body, product, response, history = null) {
 
   const historySummary = response.history || history;
 
-  body.appendChild(buildHeadline(product, same, historySummary));
+  body.appendChild(buildHeadline(product, same, historySummary, (response.carried || []).length));
 
   if (historySummary && historySummary.points > 1) {
     body.appendChild(buildHistory(historySummary));
@@ -143,8 +143,8 @@ function renderResults(body, product, response, history = null) {
 }
 
 /** Render the headline chosen by the core logic. */
-function buildHeadline(product, sameOffers, history) {
-  const headline = chooseHeadline(product, sameOffers, history);
+function buildHeadline(product, sameOffers, history, carriedCount = 0) {
+  const headline = chooseHeadline(product, sameOffers, history, carriedCount);
 
   const wrap = el('div', 'spread-verdict');
   if (headline.tone === 'good') wrap.classList.add('is-saving');

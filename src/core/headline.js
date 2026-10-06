@@ -26,9 +26,10 @@ import { formatPrice, bestSaving } from './price.js';
  * @param {{price: number}} product Product being viewed.
  * @param {Array<{retailer?: string, price?: number}>} sameOffers Confirmed same-product offers.
  * @param {object|null} history Price history summary for this retailer.
+ * @param {number} [carriedCount] Retailers found carrying it whose price could not be read.
  * @returns {Headline}
  */
-export function chooseHeadline(product, sameOffers = [], history = null) {
+export function chooseHeadline(product, sameOffers = [], history = null, carriedCount = 0) {
   const price = product?.price;
   const tracked = Boolean(history && history.points > 1);
   const saving = bestSaving(price, sameOffers);
@@ -88,7 +89,19 @@ export function chooseHeadline(product, sameOffers = [], history = null) {
     };
   }
 
-  // 6. First sighting. Say what happens next rather than reporting a failure.
+  // 6. Nothing priced, but retailers were found. Report what was found
+  // rather than implying the lookup came back empty -- an unpriced result is
+  // not the same as no result, and the panel lists them directly below.
+  if (carriedCount > 0) {
+    return {
+      kind: 'carried-only',
+      tone: 'neutral',
+      title: `Also sold at ${carriedCount} other ${carriedCount === 1 ? 'retailer' : 'retailers'}`,
+      detail: 'Their prices could not be confirmed, so Spread is not quoting them. Open one to check.',
+    };
+  }
+
+  // 7. First sighting. Say what happens next rather than reporting a failure.
   return {
     kind: 'now-tracking',
     tone: 'neutral',

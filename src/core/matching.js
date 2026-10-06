@@ -86,6 +86,11 @@ export function compareProducts(source, candidate) {
   if (isAccessoryFor(candidateTitle, sourceTitle)) {
     return result(0.1, VERDICT.DIFFERENT, true, { reason: 'accessory' });
   }
+  const extras = bundledExtras(candidateTitle, sourceTitle);
+  if (extras.length > 0) {
+    // Priced as a package, so the figure is not this product's price.
+    return result(0.2, VERDICT.DIFFERENT, true, { reason: 'bundled-extras', extras });
+  }
 
   // --- Decisive signal 1: explicit model/SKU fields agree. -----------------
   // Retailer-supplied model numbers are authoritative in a way titles never
@@ -240,6 +245,37 @@ function isAccessoryFor(candidateTitle, sourceTitle) {
   const source = String(sourceTitle || '');
   // If the source is itself an accessory, these are peers, not product vs part.
   return isAccessoryTitle(candidate) && !isAccessoryTitle(source);
+}
+
+/**
+ * Extra products bundled alongside the one being compared.
+ *
+ * A bundle does not have to say "bundle". A Macy's listing for
+ * "...Headphones Black Power Bank 20W 2-Port USB Wall Charger" is headphones
+ * plus two other things at a combined price, and quoting it as the price of
+ * the headphones is wrong by whatever the extras cost.
+ *
+ * The signal is a product category the candidate names and the source does
+ * not. Matching on categories rather than arbitrary extra words keeps a
+ * verbose-but-honest title from being rejected for being verbose.
+ */
+const BUNDLED_CATEGORIES = [
+  'power bank', 'wall charger', 'car charger', 'charging dock', 'charging stand',
+  'memory card', 'sd card', 'tripod', 'gimbal', 'microphone', 'webcam',
+  'keyboard', 'mouse', 'speaker', 'soundbar', 'subwoofer', 'remote',
+  'controller', 'headphones', 'earbuds', 'smartwatch', 'tablet', 'printer',
+  'ink', 'toner', 'battery pack', 'surge protector', 'extension cord',
+  'cookbook', 'storage case', 'carrying case', 'screen protector',
+];
+
+/** Categories the candidate adds that the source never mentions. */
+function bundledExtras(candidateTitle, sourceTitle) {
+  const candidate = normalizeTitle(candidateTitle);
+  const source = normalizeTitle(sourceTitle);
+
+  return BUNDLED_CATEGORIES.filter(
+    (category) => candidate.includes(category) && !source.includes(category)
+  );
 }
 
 /** A condition/bundle marker present on exactly one side. */
