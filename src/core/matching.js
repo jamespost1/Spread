@@ -273,14 +273,25 @@ const BUNDLED_CATEGORIES = [
   'cookbook', 'storage case', 'carrying case', 'screen protector',
 ];
 
-/** Categories the candidate adds that the source never mentions. */
+/**
+ * Categories the candidate adds that the source never mentions.
+ *
+ * The category has to be *introduced* as an extra -- "with a wall charger",
+ * "+ power bank" -- not merely named. Without that, any listing that spells
+ * out its own product type is read as a bundle: "AirPods Pro 2nd Gen USB-C
+ * Wireless Earbuds" was rejected because it contained the word "earbuds".
+ */
 function bundledExtras(candidateTitle, sourceTitle) {
   const candidate = normalizeTitle(candidateTitle);
   const source = normalizeTitle(sourceTitle);
 
-  return BUNDLED_CATEGORIES.filter(
-    (category) => candidate.includes(category) && !source.includes(category)
-  );
+  return BUNDLED_CATEGORIES.filter((category) => {
+    if (source.includes(category)) return false;
+    const introduced = new RegExp(
+      `\\b(?:with|plus|includes?|and|bundled)\\s+(?:a |an |the |\\d+\\s*)?${category}\\b`
+    );
+    return introduced.test(candidate);
+  });
 }
 
 /** A condition/bundle marker present on exactly one side. */

@@ -177,6 +177,31 @@ describe('compareProducts — the precision invariant', () => {
     expect(r.verdict).not.toBe(VERDICT.DIFFERENT);
   });
 
+  it('does not mistake a product noun for a bundled extra', () => {
+    // "AirPods Pro 2nd Gen USB-C Wireless Earbuds" was rejected as a bundle
+    // because it contained the word "earbuds" -- its own product type. A
+    // bundled extra has to be introduced as one.
+    const r = compareProducts(
+      { title: 'Apple AirPods Pro (2nd Generation) with MagSafe Case USB-C', brand: 'Apple' },
+      { title: 'Apple AirPods Pro 2nd Gen USB-C Wireless Earbuds', brand: 'Apple' }
+    );
+    expect(r.signals.reason).not.toBe('bundled-extras');
+  });
+
+  it('still catches an extra that is introduced as one', () => {
+    for (const title of [
+      'Sony WH-1000XM6 Headphones with Power Bank',
+      'Sony WH-1000XM6 Headphones plus Wall Charger',
+      'Sony WH-1000XM6 Headphones and a Carrying Case',
+    ]) {
+      const r = compareProducts(
+        { title: 'Sony WH-1000XM6 Wireless Headphones', brand: 'Sony' },
+        { title, brand: 'Sony' }
+      );
+      expect(r.verdict, title).toBe(VERDICT.DIFFERENT);
+    }
+  });
+
   it('rejects a standalone item offered against a bundle', () => {
     // The reverse direction, observed live: a bundle page was offered the
     // standalone product as a $35 saving. It is cheaper because it is less.

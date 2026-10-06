@@ -89,7 +89,7 @@ async function adjudicateOne(pair) {
     model: ADJUDICATOR_MODEL,
     max_tokens: 512,
     system:
-      'Decide whether two retail listings are the same purchasable item. Adjacent model generations, different capacities, different pack sizes, bundles, and refurbished units are all DIFFERENT. Colour variants of one model are SAME.',
+      'Decide whether two retail listings are the same purchasable item. Adjacent model generations, different capacities, different pack sizes, different colourways or sizes, bundles, and refurbished units are all DIFFERENT. A listing that merely words the same product differently is SAME.',
     tools: [
       {
         name: 'record_verdict',

@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = `You decide whether two retail product listings are the sa
 You are the second stage of a matching pipeline. A deterministic scorer already handled the easy cases; every pair you receive is one it could not resolve, so expect genuinely hard comparisons.
 
 Rules:
-- SAME means a shopper buying either listing receives the same physical item. Colour or minor cosmetic variants of one model are SAME. Different capacity, size, pack count, or model generation are NOT.
+- SAME means a shopper buying either listing receives the same physical item, in the same colour and size. A different colourway or size is a different SKU, stocked and priced separately, so it is NOT the same. Neither are different capacity, pack count, or model generation.
 - Adjacent model generations (XM4 vs XM5, Series 8 vs Series 9) are DIFFERENT even though their titles look nearly identical. This is the most common trap.
 - A bundle, multipack, or "with accessories" listing is DIFFERENT from the standalone item.
 - Refurbished, renewed, or used listings are DIFFERENT from new.

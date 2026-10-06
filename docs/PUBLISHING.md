@@ -294,6 +294,9 @@ Then redeploy. Also update `host_permissions` and `DEFAULT_API_BASE` in
 ## Release checklist
 
 - [ ] `npm test` and `npm run eval` pass
+- [ ] `npm run eval:llm` run manually — **CI only gates the deterministic stage**,
+      so a precision regression introduced by the adjudicator or its prompt will
+      not be caught automatically. Costs a few cents. Precision must stay at 100%.
 - [ ] `npm run build && node scripts/verify-build.mjs` passes
 - [ ] Version bumped in `public/manifest.json` **and** `package.json`
 - [ ] Privacy policy live at its GitHub Pages URL
