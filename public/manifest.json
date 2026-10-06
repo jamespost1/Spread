@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Spread \u2014 Real prices across retailers",
+  "name": "Spread \u2014 Price history & comparison",
   "version": "1.0.0",
-  "description": "See what the product you're viewing actually costs at other retailers, with verified same-product matching.",
+  "description": "Know whether today's price is actually good. Spread tracks price history on the product pages you visit.",
   "permissions": [
     "storage",
     "activeTab"

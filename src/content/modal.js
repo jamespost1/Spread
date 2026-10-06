@@ -5,7 +5,8 @@
 // old version stringified result sets into data- attributes and re-parsed
 // them, which was both fragile and unnecessary.
 
-import { formatPrice, priceDelta, bestSaving } from '../core/price.js';
+import { formatPrice, priceDelta } from '../core/price.js';
+import { chooseHeadline } from '../core/headline.js';
 import { isSafeHttpUrl } from '../core/retailers.js';
 
 const PANEL_CLASS = 'spread-panel';
@@ -99,9 +100,12 @@ function renderLoading(body) {
 function renderError(body, message, history = null) {
   body.replaceChildren();
 
-  // Price history is local to this product and does not depend on the
-  // comparison succeeding, so show it even when the lookup failed.
-  if (history) body.appendChild(buildHistory(history));
+  // Price history does not depend on the comparison succeeding, so it still
+  // leads -- a failed lookup should cost the comparison, not the whole panel.
+  if (history && history.points > 1) {
+    body.appendChild(buildHeadline({ price: history.current }, [], history));
+    body.appendChild(buildHistory(history));
+  }
 
   const wrap = el('div', 'spread-state');
   wrap.appendChild(el('p', 'spread-state-title', 'Could not compare right now'));
@@ -118,61 +122,32 @@ function renderResults(body, product, response, history = null) {
   const same = offers.filter((o) => o.match?.verdict === 'same');
   const similar = offers.filter((o) => o.match?.verdict === 'similar');
 
-  body.appendChild(buildVerdict(product, same));
-
   const historySummary = response.history || history;
+
+  body.appendChild(buildHeadline(product, same, historySummary));
+
   if (historySummary && historySummary.points > 1) {
     body.appendChild(buildHistory(historySummary));
   }
-
   if (same.length > 0) {
-    body.appendChild(buildSection('Same product', buildOfferTable(product, same)));
+    body.appendChild(buildSection('Also available at', buildOfferTable(product, same)));
   }
   if (similar.length > 0) {
     body.appendChild(buildSection('Worth considering', buildOfferTable(product, similar)));
-  }
-  if (offers.length === 0) {
-    const empty = el('div', 'spread-state');
-    empty.appendChild(el('p', 'spread-state-title', 'No other listings found'));
-    empty.appendChild(
-      el('p', 'spread-state-text', 'None of the retailers Spread can price are carrying this item.')
-    );
-    body.appendChild(empty);
   }
 
   body.appendChild(buildFooter(response));
 }
 
-/** The headline: the single number the user came for. */
-function buildVerdict(product, sameOffers) {
-  const wrap = el('div', 'spread-verdict');
-  const saving = bestSaving(product.price, sameOffers);
+/** Render the headline chosen by the core logic. */
+function buildHeadline(product, sameOffers, history) {
+  const headline = chooseHeadline(product, sameOffers, history);
 
-  if (saving) {
-    wrap.classList.add('is-saving');
-    wrap.appendChild(el('div', 'spread-verdict-amount', `Save ${formatPrice(saving.savings)}`));
-    wrap.appendChild(
-      el(
-        'div',
-        'spread-verdict-detail',
-        `${saving.best.retailer} has this for ${formatPrice(saving.best.price)}, versus ${formatPrice(product.price)} here.`
-      )
-    );
-  } else if (sameOffers.length > 0) {
-    wrap.appendChild(el('div', 'spread-verdict-amount', 'This is the best price'));
-    wrap.appendChild(
-      el(
-        'div',
-        'spread-verdict-detail',
-        `Checked ${sameOffers.length} other listing${sameOffers.length === 1 ? '' : 's'}. Nothing cheaper.`
-      )
-    );
-  } else {
-    wrap.appendChild(el('div', 'spread-verdict-amount', 'No exact match found'));
-    wrap.appendChild(
-      el('div', 'spread-verdict-detail', 'Spread could not confirm this exact item elsewhere.')
-    );
-  }
+  const wrap = el('div', 'spread-verdict');
+  if (headline.tone === 'good') wrap.classList.add('is-saving');
+  wrap.appendChild(el('div', 'spread-verdict-amount', headline.title));
+  wrap.appendChild(el('div', 'spread-verdict-detail', headline.detail));
+  wrap.dataset.kind = headline.kind;
   return wrap;
 }
 
@@ -282,11 +257,14 @@ function buildFooter(response) {
   const m = response.matching || {};
 
   const bits = [];
-  if (response.cached) bits.push('cached result');
+  if (response.cached) bits.push('cached');
+  if (m.fromObservations > 0) bits.push(`${m.fromObservations} from observed prices`);
   if (m.adjudicated > 0) bits.push(`${m.adjudicated} AI-verified`);
   if (m.resolvedByHeuristics > 0) bits.push(`${m.resolvedByHeuristics} matched locally`);
 
-  footer.appendChild(el('span', 'spread-footer-text', bits.join(' · ') || 'Prices from retailer APIs'));
+  footer.appendChild(
+    el('span', 'spread-footer-text', bits.join(' · ') || 'Prices recorded as you browse')
+  );
   return footer;
 }
 

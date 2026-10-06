@@ -1,6 +1,6 @@
 # Spread
 
-**See what the product you're looking at actually costs everywhere else.**
+**Know whether today's price is actually good.**
 
 [![CI](https://github.com/jamespost1/Spread/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/Spread/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-140%20passing-0b6b3a)](tests/)
@@ -8,11 +8,22 @@
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Spread is a Chrome extension that puts a **Compare price** button on product pages at Amazon,
-Target, Walmart, Best Buy, eBay and Costco. Click it and you get the real, current price for the
-*same* product at other retailers — shipping folded in, no coupon spam, no affiliate bait.
+Spread is a Chrome extension that puts a **Check price** button on product pages at Amazon,
+Target, Walmart, Best Buy, eBay and Costco. It records what things cost as you browse, so when you
+come back it can tell you whether the price moved — and when it can confirm the same item somewhere
+cheaper, it tells you that too.
 
-There is nothing to configure. Install it and it works.
+No account, no API keys, nothing to configure. Install it and it works.
+
+> **Lowest price in 23 days**
+> $299.99 now, down from $399.99 at its highest.
+
+**Why history first?** Every retailer product API is behind an approval gate — Best Buy wants a
+business email and a review, eBay rejects applications, Amazon requires qualifying affiliate sales.
+A product whose core value depends on winning those is a product you do not control. Price history
+needs nobody's permission: it works from the page the user is already looking at, on every
+supported retailer, from the second visit onward. Cross-retailer comparison is layered on top and
+improves as more prices are observed.
 
 ---
 
@@ -242,8 +253,9 @@ deploys the Worker. See [docs/PUBLISHING.md](docs/PUBLISHING.md) for the one-tim
 
 **Reads prices from:** Amazon · Target · Walmart · Best Buy · eBay · Costco
 
-**Compares against:** Best Buy · eBay, plus any supported retailer whose price has
-been observed on a page recently
+**Compares against:** any supported retailer whose price has been observed recently, plus Best Buy
+and eBay when API credentials are configured (both are behind approval gates; the extension works
+fully without them)
 
 Amazon and Target have no openly available product API — Amazon's requires an Associates account
 with qualifying sales — so they work as *source* pages, read client-side from the page you are

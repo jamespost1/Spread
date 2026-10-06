@@ -20,11 +20,11 @@ Upload it in the developer console and fill in the listing. Keep the item ID fro
 
 ### Listing content
 
-- **Name:** Spread — Real prices across retailers
+- **Name:** Spread — Price history & comparison
 - **Category:** Shopping
 - **Privacy policy URL:** `https://jamespost1.github.io/Spread/privacy.html`
   (enable GitHub Pages on the `docs/` folder first)
-- **Single purpose:** "Show the price of the product the user is viewing at other retailers."
+- **Single purpose:** "Show the price history of the product the user is viewing, and its price at other retailers where known."
 - **Permission justifications:**
   - `storage` — persists the user's local savings total and settings.
   - `activeTab` — lets the toolbar popup report whether Spread is active on the current tab.
