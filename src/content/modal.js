@@ -332,6 +332,15 @@ function buildFooter(response) {
   return footer;
 }
 
+/** Hostname of a URL, or an empty string if it will not parse. */
+function safeHost(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
