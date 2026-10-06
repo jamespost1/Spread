@@ -6,8 +6,9 @@
 
 import { extractProduct, isProductPage } from './extractors/index.js';
 import { openPanel, closePanel } from './modal.js';
+import { formatPrice } from '../core/price.js';
 
-const BUTTON_CLASS = 'spread-trigger';
+const PILL_CLASS = 'spread-pill';
 
 /** Product currently reflected by the injected button, so we can spot staleness. */
 let injectedFor = null;
@@ -18,6 +19,9 @@ const observedUrls = new Set();
 
 /** Most recent history summary, handed to the panel when it opens. */
 let latestHistory = null;
+
+/** Set when the user hides the pill; cleared on navigation to a new product. */
+let dismissed = false;
 
 init();
 
@@ -57,7 +61,7 @@ function watchForNavigation() {
   // Late-rendered content (prices in particular) arrives well after load.
   // Only react to added nodes, and only while we have no button up.
   const observer = new MutationObserver((records) => {
-    if (document.querySelector(`.${BUTTON_CLASS}`) && location.href === lastUrl) return;
+    if (document.querySelector(`.${PILL_CLASS}`) && location.href === lastUrl) return;
     if (records.some((r) => r.addedNodes.length > 0)) schedule();
   });
   observer.observe(document.body, { childList: true, subtree: true });
@@ -67,9 +71,13 @@ function scan() {
   const navigated = location.href !== lastUrl;
   if (navigated) {
     lastUrl = location.href;
+    dismissed = false;
+    latestHistory = null;
     removeButton();
     closePanel();
   }
+
+  if (dismissed) return;
 
   if (!isProductPage()) {
     removeButton();
@@ -80,7 +88,7 @@ function scan() {
   if (!product) return;
 
   // Re-inject when the page has moved to a different product.
-  if (injectedFor && injectedFor.url === product.url && document.querySelector(`.${BUTTON_CLASS}`)) {
+  if (injectedFor && injectedFor.url === product.url && document.querySelector(`.${PILL_CLASS}`)) {
     return;
   }
 
@@ -117,41 +125,76 @@ function observe(product) {
   }
 }
 
-/** Add a price-history signal to the button when there is one worth showing. */
-function annotateButton(history) {
-  const button = document.querySelector(`.${BUTTON_CLASS}`);
-  if (!button || !history) return;
-
-  if (history.isLowest && history.days >= 7) {
-    button.textContent = `Price history · lowest in ${history.days}d`;
-  } else if (history.dropFromHighest > 0) {
-    button.textContent = 'Price history';
-  }
-}
 
 function injectButton(product) {
-  const anchor = product.priceElement;
-  if (!anchor || !anchor.isConnected) return;
+  // Fixed position, appended to body, deliberately not anchored to the price.
+  //
+  // Anchoring was the single most fragile thing in the extension: it put the
+  // button inside a hidden container on Target and beside the shopping cart on
+  // Best Buy, and retailer SPAs destroy injected nodes when they re-render. A
+  // fixed element outside their tree has none of those failure modes, sits in
+  // the same place on every retailer, and can show the answer without a click.
+  if (document.querySelector(`.${PILL_CLASS}`)) return;
+
+  const pill = document.createElement('div');
+  pill.className = PILL_CLASS;
 
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = BUTTON_CLASS;
-  button.textContent = 'Price history';
-  button.setAttribute('aria-label', 'Check this price against its history and other retailers');
+  button.className = 'spread-pill-main';
+  button.setAttribute('aria-label', 'Open Spread price history for this product');
 
+  const mark = document.createElement('span');
+  mark.className = 'spread-pill-mark';
+  mark.textContent = 'Spread';
+
+  const label = document.createElement('span');
+  label.className = 'spread-pill-label';
+  label.textContent = 'Price history';
+
+  button.append(mark, label);
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    // Re-read the page at click time: prices update in place on every retailer.
+    // Re-read at click time: prices update in place on every retailer.
     openPanel(extractProduct() || product, requestComparison, latestHistory);
   });
 
-  (anchor.parentElement || anchor).insertAdjacentElement('afterend', button);
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'spread-pill-dismiss';
+  dismiss.textContent = '\u00d7';
+  dismiss.setAttribute('aria-label', 'Hide Spread on this page');
+  dismiss.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dismissed = true;
+    removeButton();
+  });
+
+  pill.append(button, dismiss);
+  document.body.appendChild(pill);
   injectedFor = product;
 }
 
+/** Put the current signal on the pill so it reads before anyone clicks. */
+function annotateButton(history) {
+  const label = document.querySelector(`.${PILL_CLASS} .spread-pill-label`);
+  const pill = document.querySelector(`.${PILL_CLASS}`);
+  if (!label || !history) return;
+
+  if (history.isLowest && history.points > 1) {
+    label.textContent = `Lowest in ${history.days}d`;
+    pill?.classList.add('is-good');
+  } else if (history.points > 1 && Number.isFinite(history.lowest) && history.lowest < history.current) {
+    label.textContent = `Was ${formatPrice(history.lowest)}`;
+  } else if (history.points > 1) {
+    label.textContent = `Steady ${history.days}d`;
+  }
+}
+
 function removeButton() {
-  document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((node) => node.remove());
+  document.querySelectorAll(`.${PILL_CLASS}`).forEach((node) => node.remove());
   injectedFor = null;
 }
 

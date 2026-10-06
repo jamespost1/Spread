@@ -2,23 +2,75 @@
    explicit, because these rules live inside someone else's stylesheet and must
    neither inherit from it nor leak into it. */
 
-.spread-trigger {
+.spread-pill {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: stretch;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border: 1px solid #d6dbe2 !important;
+  box-shadow: 0 6px 24px rgba(8, 12, 18, 0.16) !important;
+  overflow: hidden;
+  font: 500 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  animation: spread-pill-in 180ms ease-out;
+}
+
+.spread-pill-main {
   all: unset;
   box-sizing: border-box;
-  display: inline-flex !important;
+  display: flex !important;
   align-items: center;
-  gap: 6px;
-  margin: 8px 0 !important;
-  padding: 8px 14px !important;
-  border-radius: 8px !important;
-  background: #0b6b3a !important;
-  color: #ffffff !important;
-  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  gap: 9px;
+  padding: 11px 13px !important;
   cursor: pointer !important;
-  transition: background 120ms ease;
+  color: #10151c !important;
 }
-.spread-trigger:hover { background: #0d7d44 !important; }
-.spread-trigger:focus-visible { outline: 2px solid #0b6b3a !important; outline-offset: 2px !important; }
+.spread-pill-main:hover { background: #f7f8fa !important; }
+.spread-pill-main:focus-visible { outline: 2px solid #0b6b3a !important; outline-offset: -2px !important; }
+
+.spread-pill-mark {
+  font-weight: 660 !important;
+  font-size: 12px !important;
+  letter-spacing: -0.01em;
+  color: #0b6b3a !important;
+  padding-right: 9px;
+  border-right: 1px solid #e4e8ee !important;
+}
+
+.spread-pill-label {
+  font-size: 13px !important;
+  color: #10151c !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spread-pill.is-good .spread-pill-label { color: #0b6b3a !important; font-weight: 600 !important; }
+
+.spread-pill-dismiss {
+  all: unset;
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  padding: 0 10px !important;
+  cursor: pointer !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  color: #8a94a0 !important;
+  border-left: 1px solid #e4e8ee !important;
+}
+.spread-pill-dismiss:hover { background: #f2f4f7 !important; color: #10151c !important; }
+.spread-pill-dismiss:focus-visible { outline: 2px solid #0b6b3a !important; outline-offset: -2px !important; }
+
+@keyframes spread-pill-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spread-pill { animation: none; }
+}
 
 .spread-panel {
   position: fixed !important;
@@ -113,6 +165,15 @@
 .spread-footer-text { font-size: 11px; color: #8a94a0 !important; }
 
 @media (prefers-color-scheme: dark) {
+  .spread-pill { background: #171c22 !important; border-color: #333b45 !important; }
+  .spread-pill-main { color: #eef2f6 !important; }
+  .spread-pill-main:hover { background: #1f252c !important; }
+  .spread-pill-mark { color: #4ade80 !important; border-right-color: #262c34 !important; }
+  .spread-pill-label { color: #eef2f6 !important; }
+  .spread-pill.is-good .spread-pill-label { color: #4ade80 !important; }
+  .spread-pill-dismiss { color: #9aa6b2 !important; border-left-color: #262c34 !important; }
+  .spread-pill-dismiss:hover { background: #262c34 !important; color: #eef2f6 !important; }
+
   .spread-card { background: #171c22 !important; }
   .spread-panel, .spread-logo, .spread-verdict-amount, .spread-offer-retailer,
   .spread-offer-price, .spread-state-title { color: #eef2f6 !important; }
