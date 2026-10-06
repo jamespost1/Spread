@@ -46,19 +46,30 @@ Know whether today's price is actually good. Spread tracks price history on the 
 
 **Detailed description:**
 
+> Rejected once for keyword spam: the six retailer names appeared twice, once
+> inside a sentence and again as a standalone list. Google reads a repeated
+> brand-name list as stuffing. They are now named exactly once, in a sentence
+> that explains where the extension runs. Do not reintroduce a "supported
+> retailers" block.
+
 ```
 Spread tells you whether the price in front of you is actually a good one.
 
-Open a product page at Amazon, Target, Walmart, Best Buy, eBay or Costco and Spread
-quietly records what it costs. Come back later and it tells you whether the price
-moved — "Lowest price in 23 days", or "$50 above the low". When it can confirm the
-same product cheaper somewhere else, it tells you that too.
+Open a product page and Spread quietly records what it costs. Come back later and
+it tells you whether the price moved — "Lowest price in 23 days", or "$50 above the
+low". When it can confirm the same product cheaper somewhere else, it tells you that
+too.
+
+WHERE IT WORKS
+
+Spread runs on product pages at six major US retailers: Amazon, Target, Walmart,
+Best Buy, eBay and Costco. It cannot run anywhere else.
 
 WHAT MAKES IT DIFFERENT
 
 Spread will not show you a price it cannot stand behind. Every number it quotes was
 read from the page it links to — that retailer's own listing, not a search result or
-a cached figure. When a price cannot be confirmed, Spread names the retailer and says
+a cached figure. When a price cannot be confirmed, Spread names the store and says
 so instead of guessing.
 
 That means you will sometimes see fewer results than other comparison tools show you.
@@ -83,18 +94,14 @@ No account. No sign-up. No tracking. No ads.
 
 On supported product pages, Spread sends that product's title and price to its own
 service so the price joins the product's history. What gets stored is a fact about the
-product — "this cost $328 at Best Buy at this time" — with no record of who saw it.
+product — "this cost $328 at this store at this time" — with no record of who saw it.
 Nothing you view on any other website is ever sent, because the extension cannot run
 anywhere else.
 
 Full policy: https://jamespost1.github.io/Spread/privacy.html
 
-SUPPORTED RETAILERS
-
-Amazon · Target · Walmart · Best Buy · eBay · Costco
-
-Spread is open source. Everything described here can be verified by reading the code:
-https://github.com/jamespost1/Spread
+Spread is open source under the AGPL. Everything described here can be verified by
+reading the code: https://github.com/jamespost1/Spread
 ```
 
 ### Review form answers — paste as-is
