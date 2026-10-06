@@ -36,6 +36,117 @@ Upload it in the developer console and fill in the listing. Keep the item ID fro
   unrelated to the extension's single purpose. The privacy policy spells this out -- keep the two
   consistent, since a mismatch between them is a common rejection reason.
 
+### Listing copy — paste as-is
+
+**Short description** (132 character limit, currently 104):
+
+```
+Know whether today's price is actually good. Spread tracks price history on the product pages you visit.
+```
+
+**Detailed description:**
+
+```
+Spread tells you whether the price in front of you is actually a good one.
+
+Open a product page at Amazon, Target, Walmart, Best Buy, eBay or Costco and Spread
+quietly records what it costs. Come back later and it tells you whether the price
+moved — "Lowest price in 23 days", or "$50 above the low". When it can confirm the
+same product cheaper somewhere else, it tells you that too.
+
+WHAT MAKES IT DIFFERENT
+
+Spread will not show you a price it cannot stand behind. Every number it quotes was
+read from the page it links to — that retailer's own listing, not a search result or
+a cached figure. When a price cannot be confirmed, Spread names the retailer and says
+so instead of guessing.
+
+That means you will sometimes see fewer results than other comparison tools show you.
+It also means the numbers are real.
+
+It is equally careful about what counts as the same product. A carrying case that
+mentions your headphones is not your headphones. A refurbished unit is not a new one.
+A bundle with a charger thrown in is not the standalone item. "Apple Watch Series 9"
+and "Series 8" are 88% identical as text and a hundred dollars apart — Spread treats
+them as different, because they are.
+
+HOW TO USE IT
+
+• A small Spread panel appears on supported product pages
+• Click it for price history and any confirmed cheaper offers
+• Price history needs a second visit to say anything useful — there is nothing to
+  compare against the first time you look
+
+PRIVACY
+
+No account. No sign-up. No tracking. No ads.
+
+On supported product pages, Spread sends that product's title and price to its own
+service so the price joins the product's history. What gets stored is a fact about the
+product — "this cost $328 at Best Buy at this time" — with no record of who saw it.
+Nothing you view on any other website is ever sent, because the extension cannot run
+anywhere else.
+
+Full policy: https://jamespost1.github.io/Spread/privacy.html
+
+SUPPORTED RETAILERS
+
+Amazon · Target · Walmart · Best Buy · eBay · Costco
+
+Spread is open source. Everything described here can be verified by reading the code:
+https://github.com/jamespost1/Spread
+```
+
+### Review form answers — paste as-is
+
+**Single purpose:**
+
+```
+Show the price history of the product the user is viewing, and its price at other
+retailers where that price can be verified.
+```
+
+**Why `storage`:**
+
+```
+Stores the user's price-history settings and their running total of savings found, on
+their own device. Nothing in storage leaves the browser.
+```
+
+**Why `activeTab`:**
+
+```
+The toolbar popup reads the current tab's URL to tell the user whether Spread is
+active on the page they are looking at. No page content is accessed.
+```
+
+**Why host permissions for the six retailer domains:**
+
+```
+Spread reads the product title and price from product pages at these six retailers in
+order to show the user that product's price history and compare it with other
+retailers. It cannot run on any other site.
+```
+
+**Why host permission for spread-api.jamesbpost.workers.dev:**
+
+```
+The extension's own backend. It performs the price lookups and holds the API
+credentials, so that no credentials ship inside the extension.
+```
+
+**Data use disclosure:** tick **"Website content"** only, and mark it as transferred
+off-device. Leave every other category unticked — no PII, no health, no financial
+information, no authentication data, no location, no activity tracking.
+
+Then certify all three statements: not sold to third parties, not used or transferred
+for any purpose unrelated to the single purpose, and not used to determine
+creditworthiness or for lending.
+
+> **Be precise about timing.** Product title and price are sent on product-page
+> *views*, not only when the user clicks. The privacy policy says this explicitly, and
+> a mismatch between the policy and the disclosure is a common rejection reason.
+
 ### Assets you need
 
 | Asset | Size | Notes |
