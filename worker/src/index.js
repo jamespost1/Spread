@@ -150,8 +150,16 @@ async function handleCompare(request, env, ctx) {
     generatedAt: new Date().toISOString(),
   };
 
-  // Cache in the background so the response is not held up by the write.
-  ctx.waitUntil(putOffers(env.SPREAD_KV, cacheKey, payload));
+  // Only cache an answer something could actually have answered.
+  //
+  // With no source configured, "no offers" is an artifact of the deployment,
+  // not a fact about the product -- and caching it means a newly added API key
+  // appears to do nothing until the entry expires. That is exactly what
+  // happened when the Shopping key was first set.
+  const anySourceLive = Object.values(sources).some((s) => s.ok && s.error !== 'not-configured');
+  if (anySourceLive) {
+    ctx.waitUntil(putOffers(env.SPREAD_KV, cacheKey, payload));
+  }
   return json({ ...payload, cached: false });
 }
 

@@ -238,7 +238,11 @@ function buildOfferTable(product, offers) {
     }
 
     if (isSafeHttpUrl(offer.url)) {
-      const link = el('a', 'spread-offer-link', 'View');
+      // Google Shopping often hands back a Google redirect rather than the
+      // retailer's own page. Promising "Visit store" and landing on Google is
+      // a small lie; name the destination instead.
+      const viaGoogle = /(^|\.)google\./i.test(safeHost(offer.url));
+      const link = el('a', 'spread-offer-link', viaGoogle ? 'View on Google' : 'Visit store');
       link.href = offer.url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -266,6 +270,15 @@ function buildFooter(response) {
     el('span', 'spread-footer-text', bits.join(' · ') || 'Prices recorded as you browse')
   );
   return footer;
+}
+
+/** Hostname of a URL, or an empty string if it will not parse. */
+function safeHost(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
 }
 
 function el(tag, className, text) {

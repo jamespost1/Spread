@@ -6,7 +6,11 @@
 //     strings, and does not change. Effectively permanent, which is what makes
 //     the LLM stage affordable.
 
-const OFFER_TTL_SECONDS = 6 * 60 * 60;         // 6 hours -- prices move.
+const OFFER_TTL_SECONDS = 6 * 60 * 60;        // 6 hours -- prices move.
+// An empty result is worth far less than a populated one and is much more
+// likely to be wrong -- a transient upstream failure looks identical to
+// "genuinely nothing for sale". Re-ask sooner.
+const EMPTY_OFFER_TTL_SECONDS = 20 * 60;
 const VERDICT_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days -- titles do not.
 
 /** Stable hash for cache keys. FNV-1a: fast, no crypto, good enough for keying. */
@@ -25,7 +29,8 @@ export async function getOffers(kv, key) {
 }
 
 export async function putOffers(kv, key, value) {
-  await kv.put(`offers:${key}`, JSON.stringify(value), { expirationTtl: OFFER_TTL_SECONDS });
+  const ttl = value?.offers?.length ? OFFER_TTL_SECONDS : EMPTY_OFFER_TTL_SECONDS;
+  await kv.put(`offers:${key}`, JSON.stringify(value), { expirationTtl: ttl });
 }
 
 export async function getVerdict(kv, key) {
