@@ -18,14 +18,21 @@ const SCRAPE_ENDPOINT = 'https://scrape.serper.dev';
 const VERIFIED_TTL_SECONDS = 6 * 60 * 60;
 
 /**
- * Fetch a product page and read its advertised price.
+ * Fetch a product page and read what it is and what it costs.
+ *
+ * Title and price are returned independently. A page whose price cannot be
+ * read is still worth identifying, because naming a retailer that carries the
+ * product requires knowing the page is that product -- and a URL found by
+ * site-restricted search can easily land on an accessory. Returning the title
+ * without a price is what lets the caller check the match before saying
+ * anything at all.
  *
  * @param {string} url Product page to read.
  * @param {string} apiKey Serper key.
  * @param {KVNamespace} kv
- * @returns {Promise<{price: number, title: string}|null>}
+ * @returns {Promise<{title: string, price: number|null}|null>}
  */
-export async function verifyPrice(url, apiKey, kv) {
+export async function readProductPage(url, apiKey, kv) {
   if (!url || !apiKey) return null;
 
   const cacheKey = `verified:${url}`.slice(0, 500);
@@ -48,7 +55,7 @@ export async function verifyPrice(url, apiKey, kv) {
     });
     if (response.ok) {
       const data = await response.json();
-      result = readProduct(data.jsonld);
+      result = readProduct(data.jsonld, data.metadata?.title);
     }
   } catch {
     return null; // Leave the cache alone so a transient failure can retry.
@@ -68,18 +75,32 @@ export async function verifyPrice(url, apiKey, kv) {
  * snippet-scraping the previous implementation of this project got wrong, and
  * a wrong price is worse than a missing one.
  */
-function readProduct(jsonld) {
+function readProduct(jsonld, pageTitle) {
   const product = findProduct(jsonld, 0);
-  if (!product) return null;
 
-  const offer = firstOffer(product.offers);
-  const currency = offer?.priceCurrency;
-  if (currency && currency !== 'USD') return null;
+  const title =
+    (product && typeof product.name === 'string' && product.name) ||
+    cleanPageTitle(pageTitle) ||
+    '';
+  if (!title) return null;
 
-  const price = parsePrice(String(offer?.price ?? offer?.lowPrice ?? ''));
-  if (!Number.isFinite(price)) return null;
+  let price = null;
+  if (product) {
+    const offer = firstOffer(product.offers);
+    const currency = offer?.priceCurrency;
+    if (!currency || currency === 'USD') {
+      const parsed = parsePrice(String(offer?.price ?? offer?.lowPrice ?? ''));
+      if (Number.isFinite(parsed)) price = parsed;
+    }
+  }
 
-  return { price, title: typeof product.name === 'string' ? product.name : '' };
+  return { title, price };
+}
+
+/** Strip the retailer suffix retailers append to a page title. */
+function cleanPageTitle(title) {
+  if (!title || typeof title !== 'string') return '';
+  return title.split(/\s+[|:–-]\s+/)[0].trim();
 }
 
 function findProduct(node, depth) {

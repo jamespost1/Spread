@@ -16,7 +16,7 @@ import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
 import { searchShopping } from './adapters/serper.js';
 import { resolveProductUrl } from './adapters/resolve-url.js';
-import { verifyPrice } from './adapters/verify.js';
+import { readProductPage } from './adapters/verify.js';
 import { adjudicate } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
@@ -282,26 +282,28 @@ async function resolveAndVerify(offers, product, env) {
       );
       if (!url) return null;
 
-      const verified = await verifyPrice(url, env.SERPER_API_KEY, env.SPREAD_KV);
-      if (!verified) {
-        // Real page, unreadable price. Name the retailer, quote nothing.
-        return { carried: { retailer: offer.retailer, url } };
-      }
+      const page = await readProductPage(url, env.SERPER_API_KEY, env.SPREAD_KV);
+      if (!page) return null;
 
-      // The page we found has to still be the product being compared. The URL
-      // came from a separate search, so this is the step that catches it
-      // landing on a different model or a different capacity.
-      if (verified.title) {
-        const match = compareProducts(product, { title: verified.title, price: verified.price });
-        if (match.verdict === VERDICT.DIFFERENT) return null;
-        offer.match = match;
+      // The page has to be the product being compared, whether or not a price
+      // came with it. The URL came from a separate site-restricted search, so
+      // this is the only thing standing between a comparison and an accessory
+      // page -- a Target listing for headphone covers was being named as a
+      // retailer carrying the headphones.
+      const match = compareProducts(product, { title: page.title, price: page.price });
+      if (match.verdict === VERDICT.DIFFERENT) return null;
+      offer.match = match;
+
+      if (!Number.isFinite(page.price)) {
+        // Right product, unreadable price. Name it, quote nothing.
+        return { carried: { retailer: offer.retailer, url } };
       }
 
       return {
         offer: {
           ...offer,
-          price: verified.price,
-          title: verified.title || offer.title,
+          price: page.price,
+          title: page.title || offer.title,
           url,
           urlKind: 'product-page',
           priceSource: 'verified-on-page',
