@@ -22,7 +22,16 @@ describe('productKey — cross-retailer stability', () => {
     const ebay = productKey({ title: 'Sony WH-1000XM5 Headphones', brand: 'Sony', model: 'Sony WH-1000XM5' });
     const amazon = productKey({ title: 'Sony WH-1000XM5 Wireless', brand: 'Sony', model: 'WH-1000XM5' });
     expect(ebay).toBe(amazon);
-    expect(ebay).toBe('m:sony:WH1000XM5');
+    expect(ebay).toBe('m:WH1000XM5');
+  });
+
+  it('joins a retailer that exposes no brand at all', () => {
+    // Observed live: Target ships no structured data and no brand markup, so
+    // it produced "m:WH1000XM5" while every other retailer produced
+    // "m:<brand>:<code>" -- one product, two identities, never joined.
+    const target = productKey({ title: 'Sony WH-1000XM5 Headphones', model: 'WH-1000XM5' });
+    const amazon = productKey({ title: 'Sony WH-1000XM5 Wireless', brand: 'Sony', model: 'WH1000XM5' });
+    expect(target).toBe(amazon);
   });
 
   it('prefers a declared model field over anything in the title', () => {

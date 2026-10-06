@@ -37,18 +37,26 @@ export function productKey(product) {
 
   const brand = normalizeTitle(product.brand || '').replace(/\s+/g, '');
 
-  // Strongest: an explicit manufacturer model number. Globally unique in
-  // practice, and identical across every retailer that carries the item.
+  // Strongest: an explicit manufacturer model number.
+  //
+  // The brand is deliberately NOT part of a model-derived key. Retailers
+  // disagree about whether they expose a brand at all -- Target ships no
+  // structured data and no brand markup -- so a conditional brand segment
+  // means the same product keys differently depending on which retailer saw
+  // it, and the two never join. Observed live: Target produced "m:WH1000XM5"
+  // while every other retailer produced "m:<brand>:<code>".
+  //
+  // A manufacturer model code is already the identity; the brand adds nothing
+  // to it. The length and digit requirements in canonicalModelCode are what
+  // keep a short code from colliding across manufacturers.
   const declared = canonicalModelCode(product.model, product.brand);
-  if (declared) return brand ? `m:${brand}:${declared}` : `m:${declared}`;
+  if (declared) return `m:${declared}`;
 
   // Next: a model code mined from the title. Only trusted when exactly one
   // distinct candidate survives -- several means we cannot tell which
   // identifies the product and which is a capacity, a year, or a pack count.
   const mined = canonicalCodes(extractModelNumbers(product.title || ''));
-  if (mined.length === 1) {
-    return brand ? `m:${brand}:${mined[0]}` : `m:${mined[0]}`;
-  }
+  if (mined.length === 1) return `m:${mined[0]}`;
 
   // Weakest: brand plus distinctive title tokens. Requires a known brand, so
   // that a generic title can never collide across manufacturers.
