@@ -10,12 +10,13 @@
 //   4. Stage 2 match (LLM)           -> only the ambiguous ones, batched+capped.
 //   5. Cache and return.
 
-import { partitionCandidates, VERDICT } from '../../src/core/matching.js';
+import { partitionCandidates, compareProducts, VERDICT } from '../../src/core/matching.js';
 import { productKey, keyStrength } from '../../src/core/product-key.js';
 import { searchBestBuy } from './adapters/bestbuy.js';
 import { searchEbay } from './adapters/ebay.js';
 import { searchShopping } from './adapters/serper.js';
 import { resolveProductUrl } from './adapters/resolve-url.js';
+import { verifyPrice } from './adapters/verify.js';
 import { adjudicate } from './adjudicator.js';
 import { budgetStatus, dailyLimitFrom, shoppingLimitFrom, reserveCall } from './budget.js';
 import { hashKey, getOffers, putOffers } from './cache.js';
@@ -147,11 +148,16 @@ async function handleCompare(request, env, ctx) {
   // Upgrade the top offers from a search page to the actual product page.
   // Only the ones a shopper is likely to click, because each unresolved pair
   // costs a search credit -- though a resolved one is cached for a month.
+  // Observed prices come from pages Spread read itself, so they need no
+  // verification; everything from Shopping does.
   const ranked = dedupeByRetailer(offers);
-  await resolveTopUrls(ranked, product, env);
+  const fromObservation = ranked.filter((o) => o.source === 'observed');
+  const verified = await resolveAndVerify(
+    ranked.filter((o) => o.source !== 'observed'), product, env
+  );
 
   const payload = {
-    offers: ranked,
+    offers: [...verified, ...fromObservation].sort(byRelevanceThenPrice),
     sources: { ...sources, observed: { ok: true, count: observed.length } },
     matching: {
       candidates: candidates.length,
@@ -212,34 +218,60 @@ async function handleObserve(request, env) {
   return json({ recorded: wrote, history: summary });
 }
 
-/** How many offers get a real product URL looked up per comparison. */
+/** How many offers are resolved and price-checked per comparison. */
 const RESOLVE_TOP_N = 4;
 
 /**
- * Replace search-page destinations with real product pages, in parallel.
+ * Replace each offer's price with the one on the page it links to.
  *
- * Mutates in place. Anything that cannot be resolved keeps the destination it
- * already had, so this can only improve a link, never remove one.
+ * Google Shopping is only a discovery signal here: it says which retailers
+ * carry the thing. The number shown has to come from the page the shopper
+ * will land on, or the two can disagree -- which they did, by $118, when the
+ * price and the link were resolved independently.
+ *
+ * An offer that cannot be resolved to a page, cannot be read, or whose page
+ * turns out to be a different product is dropped. Fewer offers that are right
+ * beats more offers that are not.
+ *
+ * @returns {object[]} The offers worth showing.
  */
-async function resolveTopUrls(offers, product, env) {
-  if (!env.SERPER_API_KEY) return;
+async function resolveAndVerify(offers, product, env) {
+  if (!env.SERPER_API_KEY) return [];
 
   const query = product.model || product.title;
-  const targets = offers
-    .filter((o) => o.urlKind === 'store-search' || o.urlKind === 'google')
-    .slice(0, RESOLVE_TOP_N);
+  const considered = offers.slice(0, RESOLVE_TOP_N);
 
-  await Promise.all(
-    targets.map(async (offer) => {
+  const checked = await Promise.all(
+    considered.map(async (offer) => {
       const url = await resolveProductUrl(
         offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV, product.title
       );
-      if (url) {
-        offer.url = url;
-        offer.urlKind = 'product-page';
+      if (!url) return null;
+
+      const verified = await verifyPrice(url, env.SERPER_API_KEY, env.SPREAD_KV);
+      if (!verified) return null;
+
+      // The page we found has to still be the product being compared. The URL
+      // came from a separate search, so this is the step that catches it
+      // landing on a different model or a different capacity.
+      if (verified.title) {
+        const match = compareProducts(product, { title: verified.title, price: verified.price });
+        if (match.verdict === VERDICT.DIFFERENT) return null;
+        offer.match = match;
       }
+
+      return {
+        ...offer,
+        price: verified.price,
+        title: verified.title || offer.title,
+        url,
+        urlKind: 'product-page',
+        priceSource: 'verified-on-page',
+      };
     })
   );
+
+  return checked.filter(Boolean);
 }
 
 /**
