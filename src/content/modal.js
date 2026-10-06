@@ -305,30 +305,31 @@ function buildOfferTable(product, offers) {
   return list;
 }
 
-/** Quietly shows how the match was decided -- useful, and honest about the AI stage. */
+/**
+ * Where these numbers came from.
+ *
+ * Previously reported pipeline internals -- "8 matched locally" counted every
+ * candidate the deterministic matcher resolved, most of which it *rejected*,
+ * while one offer was on screen. A shopper reading that reasonably concludes
+ * seven offers went missing.
+ *
+ * What is worth saying is provenance: how many listings were considered, and
+ * that every price shown was read from the page it links to.
+ */
 function buildFooter(response) {
   const footer = el('div', 'spread-footer');
   const m = response.matching || {};
+  const considered = Number(m.candidates || 0) + Number(m.fromObservations || 0);
 
   const bits = [];
-  if (response.cached) bits.push('cached');
-  if (m.fromObservations > 0) bits.push(`${m.fromObservations} from observed prices`);
-  if (m.adjudicated > 0) bits.push(`${m.adjudicated} AI-verified`);
-  if (m.resolvedByHeuristics > 0) bits.push(`${m.resolvedByHeuristics} matched locally`);
-
-  footer.appendChild(
-    el('span', 'spread-footer-text', bits.join(' · ') || 'Prices recorded as you browse')
-  );
-  return footer;
-}
-
-/** Hostname of a URL, or an empty string if it will not parse. */
-function safeHost(url) {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return '';
+  if (considered > 0) {
+    bits.push(`${considered} listing${considered === 1 ? '' : 's'} checked`);
   }
+  bits.push('prices read from each retailer\u2019s own page');
+  if (response.cached) bits.push('cached');
+
+  footer.appendChild(el('span', 'spread-footer-text', bits.join(' \u00b7 ')));
+  return footer;
 }
 
 function el(tag, className, text) {
