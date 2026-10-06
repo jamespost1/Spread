@@ -78,10 +78,57 @@ export function priceDelta(basePrice, candidatePrice) {
 export function bestSaving(basePrice, offers) {
   if (!Number.isFinite(basePrice)) return null;
 
-  const priced = (offers || []).filter((o) => Number.isFinite(o?.price) && o.price > 0);
+  // A suspect price never drives the headline. It may still be listed, with a
+  // caution, but Spread does not promise a saving it cannot stand behind.
+  const priced = (offers || []).filter(
+    (o) => Number.isFinite(o?.price) && o.price > 0 && !o.suspect
+  );
   if (priced.length === 0) return null;
 
   const best = priced.reduce((min, o) => (o.price < min.price ? o : min), priced[0]);
   const savings = Math.round((basePrice - best.price) * 100) / 100;
   return savings > 0 ? { best, savings } : null;
 }
+
+/**
+ * Mark offers that disagree with the consensus badly enough to be suspect.
+ *
+ * Observed prices come from whatever page the user opened, with none of the
+ * seller checks the Shopping path applies. A Walmart marketplace listing --
+ * unbranded, no reviews, a third-party reseller -- was recorded at $210.99
+ * for headphones that Amazon, Best Buy and Target all priced within $2 of
+ * $378, and the panel announced "Save $167.01".
+ *
+ * A real clearance can be deep, so this does not assume an outlier is wrong.
+ * It asserts something narrower: when several retailers agree closely and one
+ * sits far below them, that one has not earned the headline.
+ *
+ * @param {Array<{price?: number|null}>} offers
+ * @returns {Array} The same offers, each with `suspect` set.
+ */
+export function flagOutliers(offers) {
+  const priced = (offers || []).filter((o) => Number.isFinite(o?.price) && o.price > 0);
+
+  // Two prices cannot establish a consensus -- either could be the odd one.
+  if (priced.length < 3) {
+    return (offers || []).map((o) => ({ ...o, suspect: false }));
+  }
+
+  const sorted = priced.map((o) => o.price).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+
+  return (offers || []).map((offer) => ({
+    ...offer,
+    suspect:
+      Number.isFinite(offer?.price) && offer.price > 0 && offer.price < median * OUTLIER_FLOOR,
+  }));
+}
+
+/**
+ * How far below the median an offer may sit before it stops being quotable.
+ * Deep enough to admit a genuine clearance, shallow enough to catch a reseller
+ * undercutting the market by half.
+ */
+const OUTLIER_FLOOR = 0.6;

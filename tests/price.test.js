@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePrice, formatPrice, priceDelta, bestSaving } from '../src/core/price.js';
+import { parsePrice, formatPrice, priceDelta, bestSaving, flagOutliers } from '../src/core/price.js';
 
 describe('parsePrice', () => {
   it('parses a plain dollar amount', () => {
@@ -82,5 +82,60 @@ describe('bestSaving', () => {
   it('returns null when no offer carries a price', () => {
     expect(bestSaving(300, [{ price: null }, {}])).toBeNull();
     expect(bestSaving(300, [])).toBeNull();
+  });
+});
+
+describe('flagOutliers', () => {
+  it('flags a price far below a tight consensus', () => {
+    // Observed live: a Walmart marketplace reseller at $210.99 against three
+    // retailers within $2 of $378, headlined as "Save $167.01".
+    const flagged = flagOutliers([
+      { retailer: 'Walmart', price: 210.99 },
+      { retailer: 'Best Buy', price: 378 },
+      { retailer: 'Target', price: 379.99 },
+    ]);
+    expect(flagged.find((o) => o.retailer === 'Walmart').suspect).toBe(true);
+    expect(flagged.find((o) => o.retailer === 'Best Buy').suspect).toBe(false);
+  });
+
+  it('leaves a genuine discount alone', () => {
+    const flagged = flagOutliers([
+      { retailer: 'A', price: 340 },
+      { retailer: 'B', price: 378 },
+      { retailer: 'C', price: 380 },
+    ]);
+    expect(flagged.some((o) => o.suspect)).toBe(false);
+  });
+
+  it('flags nothing when there is no consensus to measure against', () => {
+    // Two prices cannot establish one -- either could be the odd one out.
+    const flagged = flagOutliers([
+      { retailer: 'A', price: 199 },
+      { retailer: 'B', price: 378 },
+    ]);
+    expect(flagged.some((o) => o.suspect)).toBe(false);
+  });
+
+  it('keeps a suspect price out of the headline saving', () => {
+    const flagged = flagOutliers([
+      { retailer: 'Walmart', price: 210.99 },
+      { retailer: 'Best Buy', price: 378 },
+      { retailer: 'Target', price: 379.99 },
+    ]);
+    expect(bestSaving(378, flagged)).toBeNull();
+  });
+
+  it('still reports a saving from a trustworthy offer', () => {
+    const flagged = flagOutliers([
+      { retailer: 'A', price: 340 },
+      { retailer: 'B', price: 378 },
+      { retailer: 'C', price: 380 },
+    ]);
+    expect(bestSaving(378, flagged).savings).toBe(38);
+  });
+
+  it('handles empty input', () => {
+    expect(flagOutliers([])).toEqual([]);
+    expect(flagOutliers(null)).toEqual([]);
   });
 });

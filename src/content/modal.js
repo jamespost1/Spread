@@ -5,7 +5,7 @@
 // old version stringified result sets into data- attributes and re-parsed
 // them, which was both fragile and unnecessary.
 
-import { formatPrice, priceDelta } from '../core/price.js';
+import { formatPrice, priceDelta, flagOutliers } from '../core/price.js';
 import { chooseHeadline } from '../core/headline.js';
 import { isSafeHttpUrl } from '../core/retailers.js';
 
@@ -118,7 +118,7 @@ function renderError(body, message, history = null) {
 function renderResults(body, product, response, history = null) {
   body.replaceChildren();
 
-  const offers = response.offers || [];
+  const offers = flagOutliers(response.offers || []);
   const same = offers.filter((o) => o.match?.verdict === 'same');
   const similar = offers.filter((o) => o.match?.verdict === 'similar');
 
@@ -263,6 +263,14 @@ function buildOfferTable(product, offers) {
     if (offer.seller && offer.seller.toLowerCase() !== (offer.retailer || '').toLowerCase()) {
       // A marketplace listing is not the store's own offer; say who is selling.
       main.appendChild(el('span', 'spread-offer-note', `sold by ${offer.seller}`));
+    }
+    if (offer.suspect) {
+      // Far below what every other retailer is charging. Often a marketplace
+      // reseller rather than the store itself, so say so rather than quietly
+      // presenting it as the retailer's price.
+      main.appendChild(
+        el('span', 'spread-offer-note is-warn', 'far below other retailers — check the seller')
+      );
     }
     if (offer.source === 'observed' && Number.isFinite(offer.observedAt)) {
       // Not a live quote -- be explicit rather than let it read as current.
