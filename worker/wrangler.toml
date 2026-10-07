@@ -18,8 +18,11 @@ SHOPPING_DAILY_LIMIT = "250"
 # specific offer. Set to "true" to include them.
 INCLUDE_MARKETPLACE = "false"
 ADJUDICATOR_MODEL = "claude-haiku-4-5"
-# Set to chrome-extension://<published-id> after the first Web Store release.
-ALLOWED_ORIGIN = "*"
+# The published extension. Chrome bypasses CORS for the service worker's own
+# fetches because this Worker's host is in the extension's host_permissions, so
+# narrowing this cannot break a live install -- what it stops is an arbitrary
+# web page calling the Worker from a browser and spending the API budget.
+ALLOWED_ORIGIN = "chrome-extension://meflkmgahllegjeppnoolljigmbkkofi"
 
 # Shared cache: offers (6h), match verdicts (90d), OAuth tokens, budget counters.
 [[kv_namespaces]]
