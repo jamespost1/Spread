@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  Store-screenshot harness. Served from the repo root so that the real panel
+  module and the real stylesheet load unmodified:
+
+      brand/screenshots/shoot.sh
+
+  The point of rendering rather than hand-capturing is that this cannot drift.
+  The card below is built by src/content/modal.js and styled by
+  public/styles.css -- the same two files that ship. Change the panel and the
+  screenshots change with it.
+
+  Query parameters:
+    scene=<id>     which scene from scenes.js to render (required)
+    backdrop=1     composite over backdrops/<id>.png (a real page capture)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spread — screenshot harness</title>
+<link rel="stylesheet" href="/public/styles.css">
+<style>
+  /* Logical viewport. shoot.sh renders this at a 1.28 device pixel ratio, so
+     1000x625 comes out as exactly the 1280x800 the Web Store wants -- scaled
+     by the compositor at paint time, which keeps text crisp and avoids the
+     layer artifacts a CSS transform on the card introduced. */
+  html, body { margin: 0; padding: 0; width: 1000px; height: 625px; overflow: hidden; }
+
+  /* Fallback backdrop: brand ink, used when no real page capture is supplied.
+     Kept deliberately plain so the panel is unambiguously the subject. */
+  body {
+    background: radial-gradient(120% 120% at 18% 0%, #1C2522 0%, #101614 58%, #0A0E0C 100%);
+  }
+  body.has-backdrop {
+    background: #fff center top / 1000px auto no-repeat;
+  }
+
+  /* Margin rather than a transform: it shifts the card clear of the caption
+     without promoting it to its own compositing layer. */
+  .spread-card { margin-top: 56px; }
+
+  /* The caption sits in the scrim above the card, where the real panel leaves
+     empty space anyway. Inside the overlay so it clears the panel's z-index. */
+  .shot-caption {
+    position: absolute; left: 0; right: 0; top: 30px;
+    display: flex; flex-direction: column; align-items: center; gap: 11px;
+    padding: 0 60px; box-sizing: border-box; pointer-events: none;
+  }
+  .shot-mark { width: 32px; height: 32px; display: block; }
+  .shot-text {
+    margin: 0; text-align: center; color: #fff;
+    font: 600 20px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.02em; text-wrap: balance;
+    text-shadow: 0 1px 12px rgba(0,0,0,0.55);
+  }
+</style>
+</head>
+<body>
+<script type="module">
+import { openPanel } from '/src/content/modal.js';
+import { SCENES } from './scenes.js';
+
+const params = new URLSearchParams(location.search);
+const scene = SCENES.find((s) => s.id === params.get('scene'));
+if (!scene) throw new Error(`unknown scene: ${params.get('scene')}`);
+
+if (params.get('backdrop') === '1') {
+  document.body.classList.add('has-backdrop');
+  document.body.style.backgroundImage = `url("backdrops/${scene.id}.png")`;
+}
+
+// The real entry point, with the network stubbed by the scene's response.
+openPanel(scene.product, async () => scene.response, scene.response.history ?? null);
+
+const overlay = document.querySelector('.spread-panel');
+const caption = document.createElement('div');
+caption.className = 'shot-caption';
+caption.innerHTML =
+  '<svg class="shot-mark" viewBox="0 0 128 128" aria-hidden="true">' +
+  '<rect width="128" height="128" rx="28" fill="#1C2522"/>' +
+  '<rect x="26" y="34" width="76" height="13" rx="6.5" fill="#64736D"/>' +
+  '<rect x="26" y="57.5" width="58" height="13" rx="6.5" fill="#64736D"/>' +
+  '<rect x="26" y="81" width="34" height="13" rx="6.5" fill="#4ADE80"/></svg>';
+const text = document.createElement('p');
+text.className = 'shot-text';
+text.textContent = scene.caption;          // textContent: captions are data too.
+caption.appendChild(text);
+overlay.appendChild(caption);
+
+// The close button takes focus on open, which paints a focus ring in the shot.
+document.activeElement?.blur?.();
+
+// Signal to the renderer that the panel has settled.
+requestAnimationFrame(() => requestAnimationFrame(() => { document.title = 'ready'; }));
+</script>
+</body>
+</html>
