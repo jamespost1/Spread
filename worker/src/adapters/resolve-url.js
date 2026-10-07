@@ -110,9 +110,13 @@ const NOT_A_PRODUCT = /\/(search|browse|category|catalogsearch)\b|[?&](q|query|k
  * @param {string} query Model number, or a title when there is no model.
  * @param {string} apiKey Serper key.
  * @param {KVNamespace} kv
+ * @param {string} [sourceTitle]
+ * @param {(() => Promise<boolean>)|null} [reserve] Called immediately before
+ *   the network request and may refuse it, so the daily Serper budget covers
+ *   URL resolution too. A cache hit never calls it.
  * @returns {Promise<string|null>}
  */
-export async function resolveProductUrl(retailer, query, apiKey, kv, sourceTitle = '') {
+export async function resolveProductUrl(retailer, query, apiKey, kv, sourceTitle = '', reserve = null) {
   const domain = DOMAINS[retailer];
   if (!domain || !query || !apiKey) return null;
 
@@ -130,6 +134,9 @@ export async function resolveProductUrl(retailer, query, apiKey, kv, sourceTitle
   // An empty string is a cached "looked, found nothing" -- honour it rather
   // than paying for the same failed lookup again.
   if (cached !== null) return cached || null;
+
+  // Past the cache, so this will cost a Serper call.
+  if (reserve && !(await reserve())) return null;
 
   let found = null;
   try {

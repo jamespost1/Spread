@@ -67,8 +67,7 @@ async function handleCompare(request, env, ctx) {
     return json({ error: 'invalid_product' }, 400);
   }
 
-  const installId = String(body.installId || '').slice(0, 64);
-  if (installId && !(await withinRateLimit(env, installId))) {
+  if (!(await withinRateLimit(env, limiterKey(request, body)))) {
     return json({ error: 'rate_limited' }, 429);
   }
 
@@ -101,11 +100,18 @@ async function handleCompare(request, env, ctx) {
 
   // --- Fan out to every price source we have -------------------------------
   // Google Shopping is the broad one; the first-party APIs are narrower but
-  // more precise. A capped reservation runs first so a burst cannot consume
-  // the Shopping allowance.
-  const shoppingAllowed =
-    Boolean(env.SERPER_API_KEY) &&
+  // more precise.
+  //
+  // Every Serper call draws on one counter. It previously covered only the
+  // Shopping lookup, while each comparison went on to make up to another
+  // twelve -- a URL resolution and a page read for each of RESOLVE_TOP_N
+  // offers -- none of them counted. A cap of 250 therefore permitted some
+  // 3,250 calls a day and could drain the free grant inside one. The budget
+  // now means what it says: calls, not comparisons.
+  const reserveSerper = async () =>
     (await reserveCall(env.SPREAD_KV, shoppingLimitFrom(env), 'shopping')).allowed;
+
+  const shoppingAllowed = Boolean(env.SERPER_API_KEY) && (await reserveSerper());
 
   const [bestBuy, ebay, shopping] = await Promise.allSettled([
     searchBestBuy(product, env.BESTBUY_API_KEY),
@@ -170,7 +176,7 @@ async function handleCompare(request, env, ctx) {
   // Only the ones a shopper is likely to click, because each unresolved pair
   // costs a search credit -- though a resolved one is cached for a month.
   const { offers: verified, carried } = await resolveAndVerify(
-    dedupeByRetailer(offers), product, env
+    dedupeByRetailer(offers), product, env, reserveSerper
   );
 
   const verifiedNames = new Set(verified.map((o) => (o.retailer || '').toLowerCase()));
@@ -221,8 +227,7 @@ async function handleObserve(request, env) {
     return json({ error: 'invalid_product' }, 400);
   }
 
-  const installId = String(body.installId || '').slice(0, 64);
-  if (installId && !(await withinRateLimit(env, installId))) {
+  if (!(await withinRateLimit(env, limiterKey(request, body)))) {
     return json({ error: 'rate_limited' }, 429);
   }
 
@@ -296,7 +301,7 @@ const RESOLVE_TOP_N = 6;
  *
  * @returns {{offers: object[], carried: object[]}}
  */
-async function resolveAndVerify(offers, product, env) {
+async function resolveAndVerify(offers, product, env, reserve = null) {
   if (!env.SERPER_API_KEY) return { offers: [], carried: [] };
 
   const query = product.model || product.title;
@@ -305,11 +310,14 @@ async function resolveAndVerify(offers, product, env) {
   const results = await Promise.all(
     considered.map(async (offer) => {
       const url = await resolveProductUrl(
-        offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV, product.title
+        offer.retailer, query, env.SERPER_API_KEY, env.SPREAD_KV, product.title, reserve
       );
       if (!url) return null;
 
-      const page = await readProductPage(url, env.SERPER_API_KEY, env.SPREAD_KV);
+      const page = await readProductPage(url, env.SERPER_API_KEY, env.SPREAD_KV, {
+        retailer: offer.retailer,
+        reserve,
+      });
       if (!page) return null;
 
       // The page has to be the product being compared, whether or not a price
@@ -435,10 +443,28 @@ async function adjudicatorStatus(env) {
   return status;
 }
 
+/**
+ * What to count requests against.
+ *
+ * This used to be the caller's `installId` alone, and the check was skipped
+ * when that field was absent -- so omitting one line of JSON opted out of rate
+ * limiting entirely. An installId is also client-chosen, so rotating it per
+ * request reset the window every time.
+ *
+ * The connecting IP is the part the caller does not control, so it is always
+ * the bucket. The installId narrows it further, which keeps one household
+ * behind a shared address from spending another's allowance.
+ */
+function limiterKey(request, body) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const installId = String(body?.installId || '').slice(0, 64);
+  return installId ? `${ip}:${installId}` : ip;
+}
+
 /** Fixed-window rate limit. Cheap and good enough at this scale. */
-async function withinRateLimit(env, installId) {
+async function withinRateLimit(env, bucket) {
   const window = Math.floor(Date.now() / (60 * 60 * 1000));
-  const key = `rate:${installId}:${window}`;
+  const key = `rate:${bucket}:${window}`;
   const used = Number((await env.SPREAD_KV.get(key)) || 0);
   if (used >= RATE_LIMIT_PER_HOUR) return false;
   await env.SPREAD_KV.put(key, String(used + 1), { expirationTtl: 7200 });

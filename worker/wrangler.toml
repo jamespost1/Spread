@@ -9,10 +9,21 @@ compatibility_flags = ["nodejs_compat"]
 # batched call, 200 is about $0.34/day worst case -- and the verdict cache means
 # real usage sits far below the cap. Raise deliberately.
 ADJUDICATION_DAILY_LIMIT = "200"
-# Google Shopping lookups per UTC day. Serper's free allowance is a fixed grant
-# rather than a monthly reset, so this keeps a burst from consuming it. At 60/day
-# a month of normal use stays inside the free 2,500.
-SHOPPING_DAILY_LIMIT = "250"
+# Serper calls per UTC day -- every one of them, which is the point.
+#
+# This counter used to cover only the Google Shopping lookup, while each
+# comparison went on to make up to twelve more: a URL resolution and a page
+# read for each of the six offers it considers. Those were never counted, so
+# "250" licensed roughly 3,250 calls a day and the free 2,500 grant could be
+# gone inside one. The counter now covers resolution and page reads too, and a
+# cache hit never draws on it.
+#
+# 400/day is therefore a real ceiling of about 30 cold comparisons, with
+# cached ones unlimited on top. Worst case is 400 * $0.001 = $0.40/day once
+# the free grant is spent. Watch `used` on /health and tune: too low and
+# comparisons silently stop resolving, since an exhausted budget degrades by
+# dropping offers rather than erroring.
+SHOPPING_DAILY_LIMIT = "400"
 # Third-party marketplace listings are excluded by default: their price cannot
 # be verified, the seller is not the named retailer, and no page shows that
 # specific offer. Set to "true" to include them.
