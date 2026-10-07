@@ -104,25 +104,37 @@ export function bestSaving(basePrice, offers) {
  * sits far below them, that one has not earned the headline.
  *
  * @param {Array<{price?: number|null}>} offers
+ * @param {number|null} [referencePrice] The price on the page being viewed,
+ *   used as the yardstick when there are too few offers to form a consensus.
  * @returns {Array} The same offers, each with `suspect` set.
  */
-export function flagOutliers(offers) {
+export function flagOutliers(offers, referencePrice = null) {
   const priced = (offers || []).filter((o) => Number.isFinite(o?.price) && o.price > 0);
 
-  // Two prices cannot establish a consensus -- either could be the odd one.
-  if (priced.length < 3) {
-    return (offers || []).map((o) => ({ ...o, suspect: false }));
+  // Three or more prices establish for themselves what the product costs.
+  // Below that there is no consensus to measure against, and the guard used to
+  // switch off entirely -- which left it blind exactly when there was least
+  // corroboration. A lone Best Buy offer at $198 against a $399.99 page sailed
+  // through unflagged. The page the shopper is looking at is always known and
+  // is what the comparison is against anyway, so it stands in as the reference.
+  let reference = null;
+  if (priced.length >= 3) {
+    const sorted = priced.map((o) => o.price).sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    reference =
+      sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  } else if (Number.isFinite(referencePrice) && referencePrice > 0) {
+    reference = referencePrice;
   }
 
-  const sorted = priced.map((o) => o.price).sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const median =
-    sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  if (!Number.isFinite(reference)) {
+    return (offers || []).map((o) => ({ ...o, suspect: false }));
+  }
 
   return (offers || []).map((offer) => ({
     ...offer,
     suspect:
-      Number.isFinite(offer?.price) && offer.price > 0 && offer.price < median * OUTLIER_FLOOR,
+      Number.isFinite(offer?.price) && offer.price > 0 && offer.price < reference * OUTLIER_FLOOR,
   }));
 }
 

@@ -118,7 +118,7 @@ function renderError(body, message, history = null) {
 function renderResults(body, product, response, history = null) {
   body.replaceChildren();
 
-  const offers = flagOutliers(response.offers || []);
+  const offers = flagOutliers(response.offers || [], product?.price);
   const same = offers.filter((o) => o.match?.verdict === 'same');
   const similar = offers.filter((o) => o.match?.verdict === 'similar');
 

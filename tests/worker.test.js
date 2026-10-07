@@ -3,7 +3,7 @@ import { hashKey } from '../worker/src/cache.js';
 import { reserveCall, budgetStatus } from '../worker/src/budget.js';
 import { adjudicate, lastAdjudicatorError } from '../worker/src/adjudicator.js';
 import { handleChallenge, handleNotification } from '../worker/src/ebay-compliance.js';
-import { priceAppearsOnPage } from '../worker/src/adapters/verify.js';
+import { priceAppearsOnPage, priceFromOffers } from '../worker/src/adapters/verify.js';
 import nodeCrypto from 'node:crypto';
 
 /** Minimal in-memory stand-in for a KV namespace. */
@@ -267,5 +267,87 @@ describe('adjudicator failure reporting', () => {
 
   it('reports nothing when the adjudicator has not failed', async () => {
     expect(await lastAdjudicatorError(fakeKV())).toBeNull();
+  });
+});
+
+describe('priceFromOffers', () => {
+  // The live defect. Best Buy's listing for the WH-1000XM5 published an
+  // aggregate starting at $198 -- an open-box or marketplace unit -- while the
+  // page charged $248. The old code read lowPrice, quoted $198, and linked to
+  // a page saying $248.
+  it('refuses an aggregate whose low and high disagree', () => {
+    const offers = {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'USD',
+      lowPrice: '198.00',
+      highPrice: '289.99',
+    };
+    expect(priceFromOffers(offers, 'Best Buy')).toBeNull();
+  });
+
+  it('accepts an aggregate that collapses to one price', () => {
+    const offers = {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'USD',
+      lowPrice: '248.00',
+      highPrice: '248.00',
+    };
+    expect(priceFromOffers(offers, 'Best Buy')).toBe(248);
+  });
+
+  it('reads concrete offers nested inside an aggregate', () => {
+    const offers = {
+      '@type': 'AggregateOffer',
+      lowPrice: '198.00',
+      highPrice: '289.99',
+      offers: [{ '@type': 'Offer', price: '248.00', priceCurrency: 'USD' }],
+    };
+    expect(priceFromOffers(offers, 'Best Buy')).toBe(248);
+  });
+
+  it('prefers the store\u2019s own offer over a marketplace seller', () => {
+    const offers = [
+      { '@type': 'Offer', price: '198.00', seller: { name: 'ValueDeals LLC' } },
+      { '@type': 'Offer', price: '248.00', seller: { name: 'Best Buy' } },
+    ];
+    expect(priceFromOffers(offers, 'Best Buy')).toBe(248);
+  });
+
+  it('quotes nothing when concrete offers disagree and no seller matches', () => {
+    const offers = [
+      { '@type': 'Offer', price: '198.00' },
+      { '@type': 'Offer', price: '248.00' },
+    ];
+    expect(priceFromOffers(offers, 'Best Buy')).toBeNull();
+  });
+
+  it('takes a single unambiguous offer', () => {
+    expect(priceFromOffers({ '@type': 'Offer', price: '349.99' }, 'Target')).toBe(349.99);
+  });
+
+  it('agreeing duplicates are not a disagreement', () => {
+    const offers = [
+      { '@type': 'Offer', price: '349.99' },
+      { '@type': 'Offer', price: '349.99' },
+    ];
+    expect(priceFromOffers(offers, 'Target')).toBe(349.99);
+  });
+
+  it('ignores anything not sold as new', () => {
+    const offers = [
+      { '@type': 'Offer', price: '150.00', itemCondition: 'https://schema.org/UsedCondition' },
+      { '@type': 'Offer', price: '248.00' },
+    ];
+    expect(priceFromOffers(offers, 'Best Buy')).toBe(248);
+  });
+
+  it('ignores a price in another currency', () => {
+    const offers = { '@type': 'Offer', price: '248.00', priceCurrency: 'GBP' };
+    expect(priceFromOffers(offers, 'Best Buy')).toBeNull();
+  });
+
+  it('returns null rather than throwing on junk', () => {
+    expect(priceFromOffers(null, 'Target')).toBeNull();
+    expect(priceFromOffers({}, 'Target')).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Spread \u2014 Price history & comparison",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Know whether today's price is actually good. Spread tracks price history on the product pages you visit.",
   "permissions": [
     "storage",

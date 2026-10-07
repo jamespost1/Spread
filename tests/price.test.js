@@ -86,6 +86,45 @@ describe('bestSaving', () => {
 });
 
 describe('flagOutliers', () => {
+  // The guard used to switch off below three prices, which left it blind
+  // exactly where corroboration was thinnest: a lone Best Buy offer at $198
+  // against a $399.99 page went through unflagged.
+  it('falls back to the viewed page when there is no consensus', () => {
+    const flagged = flagOutliers(
+      [{ retailer: 'Best Buy', price: 198 }, { retailer: 'Target', price: 399.99 }],
+      399.99
+    );
+    expect(flagged.find((o) => o.retailer === 'Best Buy').suspect).toBe(true);
+    expect(flagged.find((o) => o.retailer === 'Target').suspect).toBe(false);
+  });
+
+  it('leaves a merely good deal alone', () => {
+    const flagged = flagOutliers([{ retailer: 'Walmart', price: 348 }], 399.99);
+    expect(flagged[0].suspect).toBe(false);
+  });
+
+  it('flags nothing when there is neither consensus nor a reference', () => {
+    const flagged = flagOutliers([{ retailer: 'Best Buy', price: 198 }]);
+    expect(flagged[0].suspect).toBe(false);
+  });
+
+  it('a consensus outranks the viewed page price', () => {
+    // Three retailers agree near $378; the page being viewed is mispriced
+    // high. The median still decides, so the $210.99 reseller is flagged and
+    // the honest offers are not.
+    const flagged = flagOutliers(
+      [
+        { retailer: 'Walmart', price: 210.99 },
+        { retailer: 'Best Buy', price: 378 },
+        { retailer: 'Target', price: 379 },
+        { retailer: 'Amazon', price: 377 },
+      ],
+      9999
+    );
+    expect(flagged.find((o) => o.retailer === 'Walmart').suspect).toBe(true);
+    expect(flagged.filter((o) => o.suspect)).toHaveLength(1);
+  });
+
   it('flags a price far below a tight consensus', () => {
     // Observed live: a Walmart marketplace reseller at $210.99 against three
     // retailers within $2 of $378, headlined as "Save $167.01".
