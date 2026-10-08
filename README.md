@@ -2,8 +2,9 @@
 
 **Know whether today's price is actually good.**
 
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4)](https://chromewebstore.google.com/detail/meflkmgahllegjeppnoolljigmbkkofi)
 [![CI](https://github.com/jamespost1/Spread/actions/workflows/ci.yml/badge.svg)](https://github.com/jamespost1/Spread/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-210%20passing-0b6b3a)](tests/)
+[![Tests](https://img.shields.io/badge/tests-230%20passing-0b6b3a)](tests/)
 [![Match precision](https://img.shields.io/badge/match%20precision-100%25-0b6b3a)](evals/)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)](public/manifest.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
@@ -14,6 +15,8 @@ come back it can tell you whether the price moved — and when it can confirm th
 cheaper, it tells you that too.
 
 No account, no API keys, nothing to configure. Install it and it works.
+
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/meflkmgahllegjeppnoolljigmbkkofi)**
 
 > **Lowest price in 23 days**
 > $299.99 now, down from $399.99 at its highest.
